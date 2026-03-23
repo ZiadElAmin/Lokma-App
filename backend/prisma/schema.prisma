@@ -1,0 +1,88 @@
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(Customer)
+  meals     Meal[]   @relation("CookMeals")
+  orders    Order[]
+  reviews   Review[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Meal {
+  id          String       @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  image       String
+  cook        User         @relation("CookMeals", fields: [cookId], references: [id])
+  cookId      String
+  reviews     Review[]
+  rating      Float        @default(0)
+  numReviews  Int          @default(0)
+  orderItems  OrderItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Order {
+  id              String       @id @default(cuid())
+  user            User         @relation(fields: [userId], references: [id])
+  userId          String
+  orderItems      OrderItem[]
+  shippingAddress String
+  paymentMethod   String
+  paymentResult   String?
+  taxPrice        Float        @default(0.0)
+  shippingPrice   Float        @default(0.0)
+  totalPrice      Float        @default(0.0)
+  isPaid          Boolean      @default(false)
+  paidAt          DateTime?
+  isDelivered     Boolean      @default(false)
+  deliveredAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id])
+  orderId   String
+  meal      Meal    @relation(fields: [mealId], references: [id])
+  mealId    String
+  name      String
+  qty       Int
+  image     String
+  price     Float
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  name      String
+  rating    Float
+  comment   String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  meal      Meal     @relation(fields: [mealId], references: [id])
+  mealId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  Customer
+  Cook
+  Admin
+}
