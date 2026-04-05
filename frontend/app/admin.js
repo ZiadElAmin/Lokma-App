@@ -178,7 +178,7 @@ const AdminPanel = () => {
                         </View>
                         <View style={styles.revenueCard}>
                             <Text style={styles.revenueLabel}>Total Revenue</Text>
-                            <Text style={styles.revenueValue}>${(stats?.totalRevenue || 0).toFixed(2)}</Text>
+                            <Text style={styles.revenueValue}>EGP {(stats?.totalRevenue || 0).toFixed(2)}</Text>
                         </View>
                     </View>
                 );
@@ -256,7 +256,7 @@ const AdminPanel = () => {
                                     </View>
                                 </View>
                                 <Text style={styles.orderCustomer}>{item.user?.name}</Text>
-                                <Text style={styles.orderTotal}>${item.totalPrice.toFixed(2)} - {item.orderItems?.length || 0} items</Text>
+                                <Text style={styles.orderTotal}>EGP {item.totalPrice.toFixed(2)} - {item.orderItems?.length || 0} items</Text>
                                 <View style={styles.orderActions}>
                                     {!item.isPaid && (
                                         <TouchableOpacity style={styles.actionBtn} onPress={() => handleUpdateOrderStatus(item, true, false)}>

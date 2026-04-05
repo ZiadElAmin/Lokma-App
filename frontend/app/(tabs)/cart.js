@@ -54,7 +54,7 @@ const CartScreen = () => {
                                     <Ionicons name="trash-outline" size={18} color="#ff4444" />
                                 </TouchableOpacity>
                             </View>
-                            <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+                            <Text style={styles.itemPrice}>EGP {item.price.toFixed(2)}</Text>
                             <View style={styles.itemFooter}>
                                 <View style={styles.qtyContainer}>
                                     <TouchableOpacity 
@@ -71,7 +71,7 @@ const CartScreen = () => {
                                         <Ionicons name="add" size={16} color="#333" />
                                     </TouchableOpacity>
                                 </View>
-                                <Text style={styles.itemTotal}>${(item.price * item.qty).toFixed(2)}</Text>
+                                <Text style={styles.itemTotal}>EGP {(item.price * item.qty).toFixed(2)}</Text>
                             </View>
                         </View>
                     </View>
@@ -92,19 +92,19 @@ const CartScreen = () => {
                 
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Subtotal</Text>
-                    <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>EGP {subtotal.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Delivery Fee</Text>
-                    <Text style={styles.summaryValue}>${deliveryFee.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>EGP {deliveryFee.toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Tax (5%)</Text>
-                    <Text style={styles.summaryValue}>${tax.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>EGP {tax.toFixed(2)}</Text>
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalLabel}>Total</Text>
-                    <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+                    <Text style={styles.totalValue}>EGP {total.toFixed(2)}</Text>
                 </View>
                 
                 <TouchableOpacity style={styles.checkoutBtn} onPress={() => router.push('/checkout')}>

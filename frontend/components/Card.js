@@ -46,9 +46,15 @@ export const MealCard = ({
             </View>
             <View style={styles.mealCardContent}>
                 <Text style={styles.mealCardName} numberOfLines={1}>{meal.name}</Text>
+                {meal.cook && (
+                    <View style={styles.cookBadge}>
+                        <Ionicons name="restaurant" size={12} color="#ff9800" />
+                        <Text style={styles.cookBadgeText}>By {meal.cook.name}</Text>
+                    </View>
+                )}
                 <Text style={styles.mealCardDesc} numberOfLines={1}>{meal.description}</Text>
                 <View style={styles.mealCardFooter}>
-                    <Text style={styles.mealCardPrice}>${meal.price.toFixed(2)}</Text>
+                    <Text style={styles.mealCardPrice}>EGP {meal.price.toFixed(2)}</Text>
                     {onAddToCart && (
                         <TouchableOpacity style={styles.mealCardAddBtn} onPress={onAddToCart}>
                             <Ionicons name="add" size={18} color="#fff" />
@@ -104,7 +110,7 @@ export const OrderCard = ({
                 </Text>
             </View>
             <View style={styles.orderCardFooter}>
-                <Text style={styles.orderCardTotal}>${order.totalPrice.toFixed(2)}</Text>
+                <Text style={styles.orderCardTotal}>EGP {order.totalPrice.toFixed(2)}</Text>
                 <View style={styles.orderCardArrow}>
                     <Ionicons name="chevron-forward" size={20} color="#888" />
                 </View>
@@ -159,6 +165,22 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#888',
         marginBottom: 10,
+    },
+    cookBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff3e0',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 10,
+        alignSelf: 'flex-start',
+        marginBottom: 6,
+        gap: 4,
+    },
+    cookBadgeText: {
+        fontSize: 11,
+        color: '#ff9800',
+        fontWeight: '600',
     },
     mealCardFooter: {
         flexDirection: 'row',

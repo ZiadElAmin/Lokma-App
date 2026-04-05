@@ -1,0 +1,90 @@
+﻿app/(tabs)/_layout.tsx(4,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/(tabs)/_layout.tsx(12,39): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+app/(tabs)/_layout.tsx(12,44): error TS7006: Parameter 'item' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(5,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/(tabs)/cook.tsx(72,25): error TS2322: Type '{ name: string; grams: string; cost: string; } | { name: string; cost: string; }' is not assignable to type '{ name: string; grams: string; cost: string; }'.
+  Property 'grams' is missing in type '{ name: string; cost: string; }' but required in type '{ name: string; grams: string; cost: string; }'.
+app/(tabs)/cook.tsx(72,41): error TS2741: Property 'grams' is missing in type '{ name: string; cost: string; }' but required in type '{ name: string; grams: string; cost: string; }'.
+app/(tabs)/cook.tsx(75,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(75,38): error TS7006: Parameter 'field' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(75,45): error TS7006: Parameter 'value' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(77,9): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ name: string; grams: string; cost: string; }'.
+app/(tabs)/cook.tsx(81,31): error TS7006: Parameter 'index' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(112,28): error TS7006: Parameter 'meal' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(132,55): error TS2339: Property 'id' does not exist on type 'never'.
+app/(tabs)/cook.tsx(149,27): error TS7006: Parameter 'meal' implicitly has an 'any' type.
+app/(tabs)/cook.tsx(209,46): error TS2339: Property 'id' does not exist on type 'never'.
+app/(tabs)/cook.tsx(220,52): error TS2339: Property 'image' does not exist on type 'never'.
+app/(tabs)/cook.tsx(222,65): error TS2339: Property 'name' does not exist on type 'never'.
+app/(tabs)/cook.tsx(223,83): error TS2339: Property 'description' does not exist on type 'never'.
+app/(tabs)/cook.tsx(224,70): error TS2339: Property 'price' does not exist on type 'never'.
+app/(tabs)/index.tsx(4,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/(tabs)/index.tsx(23,22): error TS18046: 'err' is of type 'unknown'.
+app/(tabs)/index.tsx(38,30): error TS7006: Parameter 'item' implicitly has an 'any' type.
+app/(tabs)/index.tsx(44,34): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+app/(tabs)/index.tsx(44,39): error TS7006: Parameter 'item' implicitly has an 'any' type.
+app/(tabs)/index.tsx(100,46): error TS2339: Property 'id' does not exist on type 'never'.
+app/(tabs)/index.tsx(115,66): error TS2339: Property 'id' does not exist on type 'never'.
+app/(tabs)/index.tsx(119,53): error TS2339: Property 'image' does not exist on type 'never'.
+app/(tabs)/index.tsx(129,83): error TS2339: Property 'name' does not exist on type 'never'.
+app/(tabs)/index.tsx(130,35): error TS2339: Property 'cook' does not exist on type 'never'.
+app/(tabs)/index.tsx(133,81): error TS2339: Property 'cook' does not exist on type 'never'.
+app/(tabs)/index.tsx(136,83): error TS2339: Property 'description' does not exist on type 'never'.
+app/(tabs)/index.tsx(139,78): error TS2339: Property 'price' does not exist on type 'never'.
+app/(tabs)/index.tsx(140,43): error TS2339: Property 'rating' does not exist on type 'never'.
+app/(tabs)/index.tsx(143,83): error TS2339: Property 'rating' does not exist on type 'never'.
+app/(tabs)/profile.tsx(4,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/meal/[id].tsx(4,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/meal/[id].tsx(24,26): error TS2345: Argument of type '"Failed to load meal"' is not assignable to parameter of type 'SetStateAction<null>'.
+app/meal/[id].tsx(34,50): error TS2339: Property 'name' does not exist on type 'never'.
+app/meal/[id].tsx(66,41): error TS2339: Property 'image' does not exist on type 'never'.
+app/meal/[id].tsx(75,57): error TS2339: Property 'name' does not exist on type 'never'.
+app/meal/[id].tsx(76,62): error TS2339: Property 'price' does not exist on type 'never'.
+app/meal/[id].tsx(81,59): error TS2339: Property 'rating' does not exist on type 'never'.
+app/meal/[id].tsx(82,61): error TS2339: Property 'numReviews' does not exist on type 'never'.
+app/meal/[id].tsx(86,60): error TS2339: Property 'description' does not exist on type 'never'.
+app/meal/[id].tsx(100,64): error TS2339: Property 'price' does not exist on type 'never'.
+app/order/[id].tsx(4,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+app/order/[id].tsx(22,26): error TS2345: Argument of type '"Failed to load order"' is not assignable to parameter of type 'SetStateAction<null>'.
+app/order/[id].tsx(29,29): error TS7006: Parameter 'isPaid' implicitly has an 'any' type.
+app/order/[id].tsx(29,37): error TS7006: Parameter 'isDelivered' implicitly has an 'any' type.
+app/order/[id].tsx(35,28): error TS7006: Parameter 'isPaid' implicitly has an 'any' type.
+app/order/[id].tsx(35,36): error TS7006: Parameter 'isDelivered' implicitly has an 'any' type.
+app/order/[id].tsx(41,25): error TS7006: Parameter 'dateStr' implicitly has an 'any' type.
+app/order/[id].tsx(72,61): error TS2339: Property 'id' does not exist on type 'never'.
+app/order/[id].tsx(75,95): error TS2339: Property 'isPaid' does not exist on type 'never'.
+app/order/[id].tsx(75,109): error TS2339: Property 'isDelivered' does not exist on type 'never'.
+app/order/[id].tsx(76,47): error TS2339: Property 'isDelivered' does not exist on type 'never'.
+app/order/[id].tsx(77,78): error TS2339: Property 'isPaid' does not exist on type 'never'.
+app/order/[id].tsx(77,92): error TS2339: Property 'isDelivered' does not exist on type 'never'.
+app/order/[id].tsx(79,70): error TS2339: Property 'createdAt' does not exist on type 'never'.
+app/order/[id].tsx(86,61): error TS2339: Property 'shippingAddress' does not exist on type 'never'.
+app/order/[id].tsx(92,28): error TS2339: Property 'orderItems' does not exist on type 'never'.
+app/order/[id].tsx(92,45): error TS7006: Parameter 'item' implicitly has an 'any' type.
+app/order/[id].tsx(92,51): error TS7006: Parameter 'index' implicitly has an 'any' type.
+app/order/[id].tsx(108,74): error TS2339: Property 'itemsPrice' does not exist on type 'never'.
+app/order/[id].tsx(112,74): error TS2339: Property 'taxPrice' does not exist on type 'never'.
+app/order/[id].tsx(116,74): error TS2339: Property 'shippingPrice' does not exist on type 'never'.
+app/order/[id].tsx(120,72): error TS2339: Property 'totalPrice' does not exist on type 'never'.
+app/order/[id].tsx(129,67): error TS2339: Property 'paymentMethod' does not exist on type 'never'.
+components/ExternalLink.tsx(13,7): error TS2322: Type 'string' is not assignable to type 'RelativePathString | ExternalPathString | "/admin" | `/admin?${string}` | `/admin#${string}` | "/checkout" | `/checkout?${string}` | `/checkout#${string}` | "/" | `/?${string}` | `/#${string}` | ... 53 more ... | { ...; }'.
+components/Themed.tsx(24,32): error TS2538: Type 'null' cannot be used as an index type.
+components/Themed.tsx(24,32): error TS2538: Type 'undefined' cannot be used as an index type.
+components/Themed.tsx(29,19): error TS2538: Type 'null' cannot be used as an index type.
+components/Themed.tsx(29,19): error TS2538: Type 'undefined' cannot be used as an index type.
+components/useColorScheme.ts(5,10): error TS2367: This comparison appears to be unintentional because the types 'ColorSchemeName' and '"unspecified"' have no overlap.
+screens/(tabs)/_layout.tsx(2,28): error TS2307: Cannot find module 'expo-symbols' or its corresponding type declarations.
+screens/(tabs)/_layout.tsx(19,39): error TS2538: Type 'null' cannot be used as an index type.
+screens/(tabs)/_layout.tsx(19,39): error TS2538: Type 'undefined' cannot be used as an index type.
+screens/(tabs)/_layout.tsx(40,19): error TS2322: Type '"/CartScreen"' is not assignable to type 'RelativePathString | ExternalPathString | "/admin" | `/admin?${string}` | `/admin#${string}` | "/checkout" | `/checkout?${string}` | `/checkout#${string}` | "/" | `/?${string}` | `/#${string}` | ... 53 more ... | { ...; }'.
+screens/(tabs)/_layout.tsx(47,41): error TS2538: Type 'null' cannot be used as an index type.
+screens/(tabs)/_layout.tsx(47,41): error TS2538: Type 'undefined' cannot be used as an index type.
+screens/(tabs)/_layout.tsx(50,50): error TS2538: Type 'null' cannot be used as an index type.
+screens/(tabs)/_layout.tsx(50,50): error TS2538: Type 'undefined' cannot be used as an index type.
+screens/(tabs)/CartScreen.tsx(7,26): error TS2307: Cannot find module '@expo/vector-icons' or its corresponding type declarations.
+screens/(tabs)/CartScreen.tsx(12,42): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+screens/(tabs)/CartScreen.tsx(12,47): error TS7006: Parameter 'item' implicitly has an 'any' type.
+screens/(tabs)/CartScreen.tsx(17,43): error TS7006: Parameter 'item' implicitly has an 'any' type.
+screens/(tabs)/index.tsx(9,21): error TS7031: Binding element 'item' implicitly has an 'any' type.
+screens/(tabs)/index.tsx(51,48): error TS2345: Argument of type '"/AddMealScreen"' is not assignable to parameter of type 'RelativePathString | ExternalPathString | "/admin" | `/admin?${string}` | `/admin#${string}` | "/checkout" | `/checkout?${string}` | `/checkout#${string}` | "/" | `/?${string}` | `/#${string}` | ... 53 more ... | { ...; }'.
+screens/(tabs)/index.tsx(61,50): error TS2339: Property '_id' does not exist on type 'never'.

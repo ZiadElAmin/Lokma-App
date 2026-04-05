@@ -85,19 +85,19 @@ const CheckoutScreen = () => {
                 <Text style={styles.sectionTitle}>Order Summary</Text>
                 <View style={styles.summaryRow}>
                     <Text>Subtotal</Text>
-                    <Text>${getCartTotal().toFixed(2)}</Text>
+                    <Text>EGP {getCartTotal().toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text>Tax (5%)</Text>
-                    <Text>${(getCartTotal() * 0.05).toFixed(2)}</Text>
+                    <Text>EGP {(getCartTotal() * 0.05).toFixed(2)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                     <Text>Delivery</Text>
-                    <Text>$2.99</Text>
+                    <Text>EGP 2.99</Text>
                 </View>
                 <View style={[styles.summaryRow, styles.totalRow]}>
                     <Text style={styles.totalText}>Total</Text>
-                    <Text style={styles.totalText}>${(getCartTotal() + (getCartTotal() * 0.05) + 2.99).toFixed(2)}</Text>
+                    <Text style={styles.totalText}>EGP {(getCartTotal() + (getCartTotal() * 0.05) + 2.99).toFixed(2)}</Text>
                 </View>
             </View>
 

@@ -70,7 +70,7 @@ const CartScreen = () => {
                         <Image source={{ uri: item.image || 'https://via.placeholder.com/100' }} style={styles.itemImage} />
                         <View style={styles.itemInfo}>
                             <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                            <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+                            <Text style={styles.itemPrice}>EGP {item.price.toFixed(2)}</Text>
                         </View>
                         <View style={styles.quantityControl}>
                             <TouchableOpacity style={styles.qtyBtn} onPress={() => updateCartItemQuantity(item.id, item.qty - 1)}>
@@ -89,7 +89,7 @@ const CartScreen = () => {
                 <View style={styles.footer}>
                     <View style={styles.totalContainer}>
                         <Text style={styles.totalLabel}>Total</Text>
-                        <Text style={styles.totalPrice}>${totalPrice.toFixed(2)}</Text>
+                        <Text style={styles.totalPrice}>EGP {totalPrice.toFixed(2)}</Text>
                     </View>
                     <TouchableOpacity style={styles.checkoutBtn} onPress={handleCheckout}>
                         <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>

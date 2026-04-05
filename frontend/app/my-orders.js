@@ -93,7 +93,7 @@ const MyOrdersScreen = () => {
                         </View>
                         <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
                         <View style={styles.orderFooter}>
-                            <Text style={styles.orderTotal}>${item.totalPrice.toFixed(2)}</Text>
+                            <Text style={styles.orderTotal}>EGP {item.totalPrice.toFixed(2)}</Text>
                             <Text style={styles.orderItems}>{item.orderItems?.length || 0} items</Text>
                             <Ionicons name="chevron-forward" size={20} color="#999" />
                         </View>

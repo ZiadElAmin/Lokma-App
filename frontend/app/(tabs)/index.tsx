@@ -69,7 +69,7 @@ const MealsScreen = () => {
             <View style={styles.header}>
                 <View>
                     <Text style={styles.headerGreeting}>Good afternoon! 👋</Text>
-                    <Text style={styles.headerTitle}>Home Kitchen</Text>
+                    <Text style={styles.headerTitle}>Lokma</Text>
                 </View>
                 <TouchableOpacity style={styles.locationBtn}>
                     <Ionicons name="location" size={18} color="#ff6b35" />
@@ -136,7 +136,7 @@ const MealsScreen = () => {
                             <Text style={styles.mealDesc} numberOfLines={1}>{item.description}</Text>
                             <View style={styles.mealFooter}>
                                 <View style={styles.priceContainer}>
-                                    <Text style={styles.mealPrice}>${item.price.toFixed(2)}</Text>
+                                    <Text style={styles.mealPrice}>EGP {item.price.toFixed(2)}</Text>
                                     {item.rating > 0 && (
                                         <View style={styles.ratingContainer}>
                                             <Ionicons name="star" size={12} color="#FFD700" />

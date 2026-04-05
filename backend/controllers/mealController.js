@@ -38,6 +38,14 @@ const getMealById = asyncHandler(async (req, res) => {
         where: {
             id: req.params.id,
         },
+        include: {
+            cook: {
+                select: {
+                    id: true,
+                    name: true,
+                },
+            },
+        },
     });
 
     if (meal) {

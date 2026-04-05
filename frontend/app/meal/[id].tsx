@@ -73,7 +73,7 @@ const MealDetailScreen = () => {
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <Text style={styles.name}>{meal.name}</Text>
-                        <Text style={styles.price}>${meal.price.toFixed(2)}</Text>
+                        <Text style={styles.price}>EGP {meal.price.toFixed(2)}</Text>
                     </View>
 
                     <View style={styles.ratingContainer}>
@@ -97,7 +97,7 @@ const MealDetailScreen = () => {
 
             <View style={styles.footer}>
                 <View style={styles.priceTag}>
-                    <Text style={styles.footerPrice}>${meal.price.toFixed(2)}</Text>
+                    <Text style={styles.footerPrice}>EGP {meal.price.toFixed(2)}</Text>
                 </View>
                 <TouchableOpacity style={styles.addBtn} onPress={handleAddToCart}>
                     <Ionicons name="cart" size={20} color="#fff" />

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import mealsApi from '../../api/meals';
+import * as ImagePicker from 'expo-image-picker';
 
 const CookDashboard = () => {
     const { user } = useAuth();
@@ -92,6 +93,20 @@ const CookDashboard = () => {
         setPrice('');
         setImage('');
         setEditingMeal(null);
+    };
+
+    const pickImage = async () => {
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.5,
+            base64: true,
+        });
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+            setImage(`data:image/jpeg;base64,${result.assets[0].base64}`);
+        }
     };
 
     const openEditModal = (meal) => {
@@ -206,7 +221,7 @@ const CookDashboard = () => {
                         <View style={styles.mealInfo}>
                             <Text style={styles.mealName}>{item.name}</Text>
                             <Text style={styles.mealDesc} numberOfLines={2}>{item.description}</Text>
-                            <Text style={styles.mealPrice}>${item.price.toFixed(2)}</Text>
+                            <Text style={styles.mealPrice}>EGP {item.price.toFixed(2)}</Text>
                         </View>
                         <View style={styles.mealActions}>
                             <TouchableOpacity style={styles.editBtn} onPress={() => openEditModal(item)}>
@@ -271,13 +286,20 @@ const CookDashboard = () => {
                             </View>
                             
                             <View style={styles.inputGroup}>
-                                <Text style={styles.inputLabel}>Image URL</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={image}
-                                    onChangeText={setImage}
-                                    placeholder="https://..."
-                                />
+                                <Text style={styles.inputLabel}>Meal Image</Text>
+                                {image ? (
+                                    <View style={styles.imagePreviewContainer}>
+                                        <Image source={{ uri: image }} style={styles.imagePreview} />
+                                        <TouchableOpacity style={styles.changeImageBtn} onPress={pickImage}>
+                                            <Text style={styles.changeImageBtnText}>Change Image</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity style={styles.uploadImageBtn} onPress={pickImage}>
+                                        <Ionicons name="image-outline" size={32} color="#ff6b35" />
+                                        <Text style={styles.uploadImageText}>Tap to select an image</Text>
+                                    </TouchableOpacity>
+                                )}
                             </View>
                             
                             <TouchableOpacity
@@ -361,10 +383,10 @@ const CookDashboard = () => {
                             {calculatedPrice > 0 && (
                                 <View style={styles.resultCard}>
                                     <Text style={styles.resultLabel}>Suggested Price</Text>
-                                    <Text style={styles.resultPrice}>${calculatedPrice.toFixed(2)}</Text>
+                                    <Text style={styles.resultPrice}>EGP {calculatedPrice.toFixed(2)}</Text>
                                     <View style={styles.resultDetails}>
                                         <Text style={styles.resultDetailText}>Total Weight: {totalGrams}g</Text>
-                                        <Text style={styles.resultDetailText}>Price per 100g: ${pricePer100g.toFixed(2)}</Text>
+                                        <Text style={styles.resultDetailText}>Price per 100g: EGP {pricePer100g.toFixed(2)}</Text>
                                     </View>
                                     <TouchableOpacity style={styles.usePriceBtn} onPress={useCalculatedPrice}>
                                         <Text style={styles.usePriceBtnText}>Use This Price</Text>
@@ -671,6 +693,43 @@ const styles = StyleSheet.create({
     usePriceBtnText: {
         color: '#fff',
         fontWeight: '600',
+    },
+    imagePreviewContainer: {
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    imagePreview: {
+        width: '100%',
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 12,
+        backgroundColor: '#f0f0f0',
+    },
+    changeImageBtn: {
+        backgroundColor: '#1a1a1a',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    changeImageBtnText: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+    uploadImageBtn: {
+        height: 150,
+        backgroundColor: '#fff5f0',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: '#ff6b35',
+        borderStyle: 'dashed',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    uploadImageText: {
+        color: '#ff6b35',
+        fontWeight: '600',
+        marginTop: 8,
     },
 });
 

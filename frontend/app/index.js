@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { Link } from 'expo-router';
+import { useRouter, Redirect, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,8 +18,7 @@ const WelcomeScreen = () => {
     }
 
     if (user) {
-        router.replace('/(tabs)');
-        return null;
+        return <Redirect href="/(tabs)" />;
     }
 
     return (
@@ -31,7 +29,7 @@ const WelcomeScreen = () => {
                         <Ionicons name="restaurant" size={50} color="#ff6b35" />
                     </View>
                 </View>
-                <Text style={styles.title}>Home Kitchen</Text>
+                <Text style={styles.title}>Lokma</Text>
                 <Text style={styles.subtitle}>Delicious homemade meals,{'\n'}cooked with love</Text>
             </View>
 

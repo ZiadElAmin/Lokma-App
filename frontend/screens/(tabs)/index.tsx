@@ -17,7 +17,7 @@ const MealItem = ({ item }) => {
     return (
         <View style={styles.mealItem}>
             <RNText style={styles.mealTitle}>{item.title}</RNText>
-            <RNText>${item.price}</RNText>
+            <RNText>EGP {item.price}</RNText>
             <Button title="Add to Cart" onPress={handleAddToCart} />
         </View>
     );

@@ -95,7 +95,7 @@ const OrderDetailScreen = () => {
                                 <Text style={styles.itemName}>{item.name}</Text>
                                 <Text style={styles.itemQty}>Qty: {item.qty}</Text>
                             </View>
-                            <Text style={styles.itemPrice}>${(item.price * item.qty).toFixed(2)}</Text>
+                            <Text style={styles.itemPrice}>EGP {(item.price * item.qty).toFixed(2)}</Text>
                         </View>
                     ))}
                 </View>
@@ -105,19 +105,19 @@ const OrderDetailScreen = () => {
                     <View style={styles.summaryCard}>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Subtotal</Text>
-                            <Text style={styles.summaryValue}>${order.itemsPrice?.toFixed(2) || '0.00'}</Text>
+                            <Text style={styles.summaryValue}>EGP {order.itemsPrice?.toFixed(2) || '0.00'}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Tax</Text>
-                            <Text style={styles.summaryValue}>${order.taxPrice?.toFixed(2) || '0.00'}</Text>
+                            <Text style={styles.summaryValue}>EGP {order.taxPrice?.toFixed(2) || '0.00'}</Text>
                         </View>
                         <View style={styles.summaryRow}>
                             <Text style={styles.summaryLabel}>Delivery</Text>
-                            <Text style={styles.summaryValue}>${order.shippingPrice?.toFixed(2) || '0.00'}</Text>
+                            <Text style={styles.summaryValue}>EGP {order.shippingPrice?.toFixed(2) || '0.00'}</Text>
                         </View>
                         <View style={[styles.summaryRow, styles.totalRow]}>
                             <Text style={styles.totalLabel}>Total</Text>
-                            <Text style={styles.totalValue}>${order.totalPrice?.toFixed(2) || '0.00'}</Text>
+                            <Text style={styles.totalValue}>EGP {order.totalPrice?.toFixed(2) || '0.00'}</Text>
                         </View>
                     </View>
                 </View>
