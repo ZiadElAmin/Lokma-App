@@ -1,31 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, ScrollView } from 'react-native';
 import { Image } from 'react-native-elements';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import mealsApi from '../../api/meals';
 import * as ImagePicker from 'expo-image-picker';
 
+interface Meal {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    image?: string;
+}
+
+interface Ingredient {
+    name: string;
+    grams: string;
+    cost: string;
+}
+
 const CookDashboard = () => {
     const { user } = useAuth();
     const router = useRouter();
-    const [meals, setMeals] = useState([]);
+    const [meals, setMeals] = useState<Meal[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
-    const [editingMeal, setEditingMeal] = useState(null);
+    const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
     
-    // Meal form state
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [image, setImage] = useState('');
     const [saving, setSaving] = useState(false);
     
-    // Calculator state
-    const [ingredients, setIngredients] = useState([{ name: '', grams: '', cost: '' }]);
+    const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', grams: '', cost: '' }]);
     const [profitPercent, setProfitPercent] = useState('20');
     const [calculatedPrice, setCalculatedPrice] = useState(0);
     const [pricePer100g, setPricePer100g] = useState(0);
@@ -69,16 +81,16 @@ const CookDashboard = () => {
     };
 
     const addIngredient = () => {
-        setIngredients([...ingredients, { name: '', cost: '' }]);
+        setIngredients([...ingredients, { name: '', grams: '', cost: '' }]);
     };
 
-    const updateIngredient = (index, field, value) => {
+    const updateIngredient = (index: number, field: keyof Ingredient, value: string) => {
         const newIngredients = [...ingredients];
         newIngredients[index][field] = value;
         setIngredients(newIngredients);
     };
 
-    const removeIngredient = (index) => {
+    const removeIngredient = (index: number) => {
         setIngredients(ingredients.filter((_, i) => i !== index));
     };
 
@@ -109,7 +121,7 @@ const CookDashboard = () => {
         }
     };
 
-    const openEditModal = (meal) => {
+    const openEditModal = (meal: Meal) => {
         setEditingMeal(meal);
         setName(meal.name);
         setDescription(meal.description);
@@ -146,7 +158,7 @@ const CookDashboard = () => {
         setSaving(false);
     };
 
-    const handleDelete = (meal) => {
+    const handleDelete = (meal: Meal) => {
         Alert.alert(
             'Delete Meal',
             `Are you sure you want to delete "${meal.name}"?`,
@@ -204,7 +216,7 @@ const CookDashboard = () => {
                 </TouchableOpacity>
             </View>
 
-            <FlatList
+            <FlatList<Meal>
                 data={meals}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
@@ -234,7 +246,6 @@ const CookDashboard = () => {
                     </View>
                 )}
             />
-
             {/* Add/Edit Meal Modal */}
             <Modal visible={showAddModal} animationType="slide" transparent>
                 <View style={styles.modalOverlay}>
@@ -732,5 +743,4 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
 });
-
 export default CookDashboard;

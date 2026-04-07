@@ -10,9 +10,9 @@ const MealDetailScreen = () => {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const { addToCart } = useCart();
-    const [meal, setMeal] = useState(null);
+    const [meal, setMeal] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<any>(null);
 
     useEffect(() => {
         const fetchMeal = async () => {

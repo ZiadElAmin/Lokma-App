@@ -62,6 +62,16 @@ export default function TabLayout() {
           }}
         />
       )}
+      {(user?.role === 'Cook' || user?.role === 'Admin') && (
+    <Tabs.Screen
+        name="cook-orders"
+        options={{
+            title: 'Orders',
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => <Ionicons name="receipt" size={size} color={color} />,
+        }}
+    />
+)}
       <Tabs.Screen
         name="cart"
         options={{

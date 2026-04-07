@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ordersApi from '../api/orders';
 import withAuth from '../components/withAuth';
@@ -25,24 +25,30 @@ const MyOrdersScreen = () => {
         setRefreshing(false);
     };
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchOrders();
+        }, [])
+    );
 
     const onRefresh = () => {
         setRefreshing(true);
         fetchOrders();
     };
 
-    const getStatusColor = (isPaid, isDelivered) => {
-        if (isDelivered) return '#4CAF50';
-        if (isPaid) return '#2196F3';
-        return '#FF9800';
+    const getStatusColor = (order) => {
+        if (order.isRejected) return '#f44336';
+        if (order.isDelivered) return '#4CAF50';
+        if (order.isAccepted) return '#2196F3';
+        if (order.isPaid) return '#FF9800';
+        return '#999';
     };
 
-    const getStatusText = (isPaid, isDelivered) => {
-        if (isDelivered) return 'Delivered';
-        if (isPaid) return 'Preparing';
+    const getStatusText = (order) => {
+        if (order.isRejected) return 'Rejected';
+        if (order.isDelivered) return 'Delivered';
+        if (order.isAccepted) return 'Preparing';
+        if (order.isPaid) return 'Paid';
         return 'Pending';
     };
 
@@ -87,11 +93,16 @@ const MyOrdersScreen = () => {
                     <TouchableOpacity style={styles.orderCard} onPress={() => router.push(`/order/${item.id}`)}>
                         <View style={styles.orderHeader}>
                             <Text style={styles.orderId}>Order #{item.id.slice(-6).toUpperCase()}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.isPaid, item.isDelivered) }]}>
-                                <Text style={styles.statusText}>{getStatusText(item.isPaid, item.isDelivered)}</Text>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item) }]}>
+                                <Text style={styles.statusText}>{getStatusText(item)}</Text>
                             </View>
                         </View>
                         <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
+                        {item.isRejected && (
+                            <Text style={styles.rejectedNote}>
+                                ❌ This order was rejected by the cook.
+                            </Text>
+                        )}
                         <View style={styles.orderFooter}>
                             <Text style={styles.orderTotal}>EGP {item.totalPrice.toFixed(2)}</Text>
                             <Text style={styles.orderItems}>{item.orderItems?.length || 0} items</Text>
@@ -107,118 +118,34 @@ const MyOrdersScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8f9fa',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    errorContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    errorText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginTop: 16,
-        marginBottom: 20,
-    },
-    retryBtn: {
-        backgroundColor: '#ff6b35',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    retryBtnText: {
-        color: '#fff',
-        fontWeight: 'bold',
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    emptyText: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#666',
-        marginTop: 16,
-    },
-    emptySubtext: {
-        fontSize: 14,
-        color: '#999',
-        marginTop: 8,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        padding: 20,
-        backgroundColor: '#fff',
-        color: '#333',
-    },
-    list: {
-        padding: 16,
-    },
+    container: { flex: 1, backgroundColor: '#f8f9fa' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+    errorText: { fontSize: 16, color: '#666', textAlign: 'center', marginTop: 16, marginBottom: 20 },
+    retryBtn: { backgroundColor: '#ff6b35', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
+    retryBtnText: { color: '#fff', fontWeight: 'bold' },
+    emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    emptyText: { fontSize: 20, fontWeight: 'bold', color: '#666', marginTop: 16 },
+    emptySubtext: { fontSize: 14, color: '#999', marginTop: 8 },
+    title: { fontSize: 28, fontWeight: 'bold', padding: 20, backgroundColor: '#fff', color: '#333' },
+    list: { padding: 16 },
     orderCard: {
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
     },
-    orderHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
-    },
-    orderId: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    statusText: {
-        color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    orderDate: {
-        fontSize: 13,
-        color: '#666',
-        marginBottom: 12,
-    },
+    orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+    orderId: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+    statusText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+    orderDate: { fontSize: 13, color: '#666', marginBottom: 12 },
+    rejectedNote: { fontSize: 13, color: '#f44336', marginBottom: 8, fontStyle: 'italic' },
     orderFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee',
     },
-    orderTotal: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#ff6b35',
-    },
-    orderItems: {
-        fontSize: 14,
-        color: '#666',
-    },
+    orderTotal: { fontSize: 18, fontWeight: 'bold', color: '#ff6b35' },
+    orderItems: { fontSize: 14, color: '#666' },
 });
 
 export default withAuth(MyOrdersScreen);

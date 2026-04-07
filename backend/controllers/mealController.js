@@ -137,5 +137,25 @@ const deleteMeal = asyncHandler(async (req, res) => {
         throw new Error('Meal not found');
     }
 });
+const getCooks = asyncHandler(async (req, res) => {
+    const cooks = await prisma.user.findMany({
+        where: { role: 'Cook' },
+        select: {
+            id: true,
+            name: true,
+            meals: {
+                select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    image: true,
+                    description: true,
+                    rating: true,
+                },
+            },
+        },
+    });
+    res.json(cooks);
+});
 
-export { getMeals, getMealById, createMeal, updateMeal, deleteMeal, getCookMeals };
+export { getMeals, getMealById, createMeal, updateMeal, deleteMeal, getCookMeals, getCooks };

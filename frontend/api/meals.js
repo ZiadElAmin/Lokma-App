@@ -28,6 +28,10 @@ const updateMeal = async (id, mealData) => {
 const deleteMeal = async (id) => {
     await api.delete(`/meals/${id}`);
 };
+const getCooks = async () => {
+    const response = await api.get('/meals/cooks');
+    return response.data;
+};
 
 export default {
     getMeals,
@@ -36,4 +40,5 @@ export default {
     createMeal,
     updateMeal,
     deleteMeal,
+    getCooks,
 };

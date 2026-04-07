@@ -54,6 +54,9 @@ model Order {
   deliveredAt     DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  isAccepted      Boolean      @default(false)
+  isRejected      Boolean      @default(false)
+  aiVerified      Boolean      @default(false)
 }
 
 model OrderItem {

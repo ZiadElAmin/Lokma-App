@@ -11,6 +11,8 @@ console.log('Starting server setup...');
 
 try {
     dotenv.config();
+    console.log('JWT_SECRET at startup:', process.env.JWT_SECRET)
+    console.log('JWT_SECRET:', process.env.JWT_SECRET)
     console.log('dotenv configured.');
 
     const app = express();

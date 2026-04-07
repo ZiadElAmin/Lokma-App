@@ -7,11 +7,13 @@ import {
     updateMeal,
     deleteMeal,
     getCookMeals,
+    getCooks,
 } from '../controllers/mealController.js';
 import { protect, cook } from '../middleware/authMiddleware.js';
 
 router.route('/').get(getMeals).post(protect, cook, createMeal);
 router.route('/my-meals').get(protect, cook, getCookMeals);
+router.route('/cooks').get(getCooks);
 router
     .route('/:id')
     .get(getMealById)

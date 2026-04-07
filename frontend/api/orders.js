@@ -10,6 +10,26 @@ const getOrders = async () => {
     return response.data;
 };
 
+const getMyOrders = async () => {
+    const response = await api.get('/orders/myorders');
+    return response.data;
+};
+
+const getCookOrders = async () => {
+    const response = await api.get('/orders/cookorders');
+    return response.data;
+};
+
+const acceptOrder = async (id, aiVerified) => {
+    const response = await api.put(`/orders/${id}/accept`, { aiVerified });
+    return response.data;
+};
+
+const rejectOrder = async (id) => {
+    const response = await api.put(`/orders/${id}/reject`);
+    return response.data;
+};
+
 const getOrderById = async (id) => {
     const response = await api.get(`/orders/${id}`);
     return response.data;
@@ -23,6 +43,10 @@ const updateOrderStatus = async (id, status) => {
 export default {
     createOrder,
     getOrders,
+    getMyOrders,
+    getCookOrders,
+    acceptOrder,
+    rejectOrder,
     getOrderById,
     updateOrderStatus,
 };
