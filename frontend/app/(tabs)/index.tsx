@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, FlatList, StyleSheet, ActivityIndicator,
-    TouchableOpacity, Image, RefreshControl, Alert, ScrollView
+    TouchableOpacity, Image, RefreshControl, Alert, ScrollView, TextInput
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,27 +13,34 @@ const MealsScreen = () => {
     const [meals, setMeals] = useState([]);
     const [cooks, setCooks] = useState([]);
     const [selectedCook, setSelectedCook] = useState(null);
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<any>(null);
     const { addToCart, cartItems } = useCart();
 
-    const fetchData = async () => {
+    const fetchData = async (searchTerm = search) => {
         try {
             setError(null);
             const [mealsData, cooksData] = await Promise.all([
-                mealsApi.getMeals(),
+                mealsApi.getMeals(searchTerm, selectedCook || ''),
                 mealsApi.getCooks(),
             ]);
             setMeals(mealsData);
             setCooks(cooksData);
         } catch (err) {
             console.error('Failed to load data:', err);
-            setError(error.response?.data?.message || 'Failed to connect to server.');
+            setError('Failed to connect to server.');
         }
         setLoading(false);
         setRefreshing(false);
     };
+
+    // Search with debounce
+    useEffect(() => {
+        const timer = setTimeout(() => fetchData(search), 400);
+        return () => clearTimeout(timer);
+    }, [search, selectedCook]);
 
     // Auto refresh every time the screen comes into focus
     useFocusEffect(
@@ -81,8 +88,8 @@ const MealsScreen = () => {
         );
     }
 
-    return (
-        <View style={styles.container}>
+    const ListHeader = () => (
+        <View>
             {/* Header */}
             <View style={styles.header}>
                 <View>
@@ -106,6 +113,24 @@ const MealsScreen = () => {
                 </View>
             </View>
 
+            {/* Search Bar */}
+            <View style={styles.searchContainer}>
+                <Ionicons name="search-outline" size={20} color="#999" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search meals..."
+                    value={search}
+                    onChangeText={setSearch}
+                    placeholderTextColor="#999"
+                    returnKeyType="search"
+                />
+                {search.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearch('')}>
+                        <Ionicons name="close-circle" size={20} color="#999" />
+                    </TouchableOpacity>
+                )}
+            </View>
+
             {/* Cooks Section */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Our Cooks</Text>
@@ -113,7 +138,6 @@ const MealsScreen = () => {
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={styles.cooksScroll}
                 contentContainerStyle={styles.cooksScrollContent}
             >
                 <TouchableOpacity
@@ -145,7 +169,7 @@ const MealsScreen = () => {
                 ))}
             </ScrollView>
 
-            {/* Meals Section */}
+            {/* Meals Section Title */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
                     {selectedCook ? `${cooks.find(c => c.id === selectedCook)?.name}'s Meals` : 'Popular Meals'}
@@ -156,12 +180,17 @@ const MealsScreen = () => {
                     </TouchableOpacity>
                 )}
             </View>
+        </View>
+    );
 
+    return (
+        <View style={styles.container}>
             <FlatList
                 data={getDisplayedMeals()}
                 numColumns={2}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContainer}
+                ListHeaderComponent={ListHeader}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#ff6b35']} />
                 }
@@ -221,6 +250,7 @@ const MealsScreen = () => {
     );
 };
 
+
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f5f5f5' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' },
@@ -255,8 +285,15 @@ const styles = StyleSheet.create({
     },
     sectionTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a' },
     seeAllText: { fontSize: 14, color: '#ff6b35', fontWeight: '600' },
-    cooksScroll: { maxHeight: 60 },
-    cooksScrollContent: { paddingHorizontal: 16, gap: 8 },
+    searchContainer: {
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#fff', marginHorizontal: 20, marginTop: 16,
+        borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+        borderWidth: 1, borderColor: '#eee',
+    },
+    searchIcon: { marginRight: 8 },
+    searchInput: { flex: 1, fontSize: 15, color: '#333' },
+    cooksScrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
     cookChip: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: '#fff', borderWidth: 1, borderColor: '#ff6b35',

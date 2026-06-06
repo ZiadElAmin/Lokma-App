@@ -1,5 +1,31 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api, { setAuthToken, clearAuthToken } from '../api/client';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+    }),
+});
+
+const registerForPushNotifications = async () => {
+    try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+        }
+        if (finalStatus !== 'granted') return null;
+        const token = (await Notifications.getExpoPushTokenAsync()).data;
+        return token;
+    } catch {
+        return null;
+    }
+};
 
 const AuthContext = createContext();
 
@@ -41,14 +67,16 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            
             const response = await api.post('/users/login', { email, password });
-            
             if (response.data.token) {
                 await setAuthToken(response.data.token);
                 setUser(response.data);
+                // Register push token after login
+                const pushToken = await registerForPushNotifications();
+                if (pushToken) {
+                    api.put('/users/push-token', { token: pushToken }).catch(() => {});
+                }
             }
-            
             return response.data;
         } catch (err) {
             const message = err.response?.data?.message || 'Login failed';

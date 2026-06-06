@@ -1,22 +1,37 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { io } from 'socket.io-client';
 import ordersApi from '../../api/orders';
 import { useAuth } from '../../hooks/useAuth';
+import API_BASE_URL from '../../config';
+
+const SOCKET_URL = API_BASE_URL.replace('/api', '');
 
 const OrderDetailScreen = () => {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const [order, setOrder] = useState(null);
+    const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<any>(null);
+    const [riderLocation, setRiderLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const socketRef = useRef<any>(null);
 
     useEffect(() => {
         const fetchOrder = async () => {
             try {
                 const data = await ordersApi.getOrderById(id);
                 setOrder(data);
+                // Connect to socket if order is picked up / on the way
+                if (data.isPickedUp && !data.isDelivered) {
+                    socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
+                    socketRef.current.emit('join_order', id);
+                    socketRef.current.on('location_update', (loc: any) => {
+                        setRiderLocation(loc);
+                    });
+                }
             } catch (err) {
                 console.error(err);
                 setError('Failed to load order');
@@ -24,18 +39,29 @@ const OrderDetailScreen = () => {
             setLoading(false);
         };
         fetchOrder();
+        return () => {
+            socketRef.current?.disconnect();
+        };
     }, [id]);
 
-    const getStatusColor = (isPaid, isDelivered) => {
-        if (isDelivered) return '#4CAF50';
-        if (isPaid) return '#2196F3';
-        return '#FF9800';
+    const getStatusColor = (order: any) => {
+        if (order.isDelivered) return '#4CAF50';
+        if (order.isPickedUp) return '#9C27B0';
+        if (order.isReadyForPickup) return '#009688';
+        if (order.isAccepted) return '#2196F3';
+        if (order.isRejected) return '#f44336';
+        if (order.isPaid) return '#FF9800';
+        return '#999';
     };
 
-    const getStatusText = (isPaid, isDelivered) => {
-        if (isDelivered) return 'Delivered';
-        if (isPaid) return 'Preparing';
-        return 'Pending Payment';
+    const getStatusText = (order: any) => {
+        if (order.isDelivered) return '✅ Delivered';
+        if (order.isPickedUp) return '🛵 Rider on the way';
+        if (order.isReadyForPickup) return '🍱 Ready — awaiting rider';
+        if (order.isAccepted) return '👨‍🍳 Being prepared';
+        if (order.isRejected) return '❌ Rejected';
+        if (order.isPaid) return '⏳ Waiting for cook';
+        return '💳 Pending Payment';
     };
 
     const formatDate = (dateStr) => {
@@ -72,12 +98,45 @@ const OrderDetailScreen = () => {
             <Stack.Screen options={{ title: `Order #${order.id.slice(-6).toUpperCase()}` }} />
             <ScrollView style={styles.container}>
                 <View style={styles.statusCard}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.isPaid, order.isDelivered) }]}>
-                        <Ionicons name={order.isDelivered ? 'checkmark-circle' : 'time'} size={20} color="#fff" />
-                        <Text style={styles.statusText}>{getStatusText(order.isPaid, order.isDelivered)}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order) }]}>
+                        <Text style={styles.statusText}>{getStatusText(order)}</Text>
                     </View>
                     <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                 </View>
+
+                {/* Live Map — only visible when rider is on the way */}
+                {order.isPickedUp && !order.isDelivered && (
+                    <View style={styles.mapSection}>
+                        <Text style={styles.sectionTitle}>🛵 Rider Location</Text>
+                        {riderLocation ? (
+                            <MapView
+                                style={styles.map}
+                                provider={PROVIDER_GOOGLE}
+                                region={{
+                                    latitude: riderLocation.latitude,
+                                    longitude: riderLocation.longitude,
+                                    latitudeDelta: 0.01,
+                                    longitudeDelta: 0.01,
+                                }}
+                            >
+                                <Marker
+                                    coordinate={riderLocation}
+                                    title="Your Rider"
+                                    description="On the way to you"
+                                >
+                                    <View style={styles.riderMarker}>
+                                        <Ionicons name="bicycle" size={20} color="#fff" />
+                                    </View>
+                                </Marker>
+                            </MapView>
+                        ) : (
+                            <View style={styles.mapPlaceholder}>
+                                <ActivityIndicator color="#ff6b35" />
+                                <Text style={styles.mapWaiting}>Waiting for rider location...</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Delivery Address</Text>
@@ -264,16 +323,20 @@ const styles = StyleSheet.create({
         color: '#ff6b35',
     },
     paymentCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#f8f9fa',
-        padding: 16,
-        borderRadius: 8,
+        flexDirection: 'row', alignItems: 'center',
+        backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8,
     },
-    paymentMethod: {
-        marginLeft: 12,
-        fontSize: 15,
-        color: '#333',
+    paymentMethod: { marginLeft: 12, fontSize: 15, color: '#333' },
+    mapSection: { backgroundColor: '#fff', marginTop: 12, padding: 16 },
+    map: { width: '100%', height: 220, borderRadius: 12, marginTop: 8 },
+    mapPlaceholder: {
+        height: 120, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: '#f8f9fa', borderRadius: 12, marginTop: 8, gap: 8,
+    },
+    mapWaiting: { fontSize: 14, color: '#888' },
+    riderMarker: {
+        backgroundColor: '#ff6b35', borderRadius: 20, padding: 6,
+        borderWidth: 2, borderColor: '#fff',
     },
 });
 

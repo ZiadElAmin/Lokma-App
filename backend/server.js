@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import userRoutes from './routes/userRoutes.js';
 import mealRoutes from './routes/mealRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
@@ -16,6 +18,24 @@ try {
     console.log('dotenv configured.');
 
     const app = express();
+    const httpServer = createServer(app);
+    const io = new Server(httpServer, {
+        cors: { origin: '*', methods: ['GET', 'POST'] }
+    });
+
+    // Socket.io — rider location tracking
+    io.on('connection', (socket) => {
+        // Rider joins an order room to broadcast location
+        socket.on('join_order', (orderId) => {
+            socket.join(`order_${orderId}`);
+        });
+        // Rider emits their GPS coords
+        socket.on('rider_location', ({ orderId, latitude, longitude }) => {
+            io.to(`order_${orderId}`).emit('location_update', { latitude, longitude });
+        });
+        socket.on('disconnect', () => {});
+    });
+
     console.log('Express app created.');
 
     app.use(cors({
@@ -49,7 +69,7 @@ try {
     console.log(`Port set to ${PORT}.`);
 
     console.log('Starting server...');
-    const server = app.listen(PORT, '0.0.0.0', () => {
+    const server = httpServer.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on port ${PORT}`);
     });
 

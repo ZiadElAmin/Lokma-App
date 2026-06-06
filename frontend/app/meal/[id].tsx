@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import mealsApi from '../../api/meals';
@@ -10,15 +10,24 @@ const MealDetailScreen = () => {
     const { id } = useLocalSearchParams();
     const router = useRouter();
     const { addToCart } = useCart();
+    const { user } = useAuth();
     const [meal, setMeal] = useState<any>(null);
+    const [reviews, setReviews] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<any>(null);
+    const [myRating, setMyRating] = useState(0);
+    const [myComment, setMyComment] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchMeal = async () => {
             try {
-                const data = await mealsApi.getMealById(id);
+                const [data, reviewData] = await Promise.all([
+                    mealsApi.getMealById(id),
+                    mealsApi.getMealReviews(id),
+                ]);
                 setMeal(data);
+                setReviews(reviewData);
             } catch (err) {
                 console.error(err);
                 setError('Failed to load meal');
@@ -27,6 +36,26 @@ const MealDetailScreen = () => {
         };
         fetchMeal();
     }, [id]);
+
+    const handleSubmitReview = async () => {
+        if (myRating === 0) return Alert.alert('Select a rating', 'Tap the stars to rate this meal');
+        setSubmitting(true);
+        try {
+            await mealsApi.createReview(id, { rating: myRating, comment: myComment });
+            const [updatedMeal, updatedReviews] = await Promise.all([
+                mealsApi.getMealById(id),
+                mealsApi.getMealReviews(id),
+            ]);
+            setMeal(updatedMeal);
+            setReviews(updatedReviews);
+            setMyRating(0);
+            setMyComment('');
+            Alert.alert('Thanks!', 'Your review has been submitted.');
+        } catch (err: any) {
+            Alert.alert('Error', err?.response?.data?.message || 'Could not submit review');
+        }
+        setSubmitting(false);
+    };
 
     const handleAddToCart = () => {
         if (meal) {
@@ -89,9 +118,62 @@ const MealDetailScreen = () => {
                         <Ionicons name="person-circle" size={40} color="#ff6b35" />
                         <View style={styles.cookDetails}>
                             <Text style={styles.cookLabel}>Prepared by</Text>
-                            <Text style={styles.cookName}>Home Cook</Text>
+                            <Text style={styles.cookName}>{meal.cook?.name || 'Home Cook'}</Text>
                         </View>
                     </View>
+
+                    {/* Reviews */}
+                    <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Reviews</Text>
+                    {reviews.length === 0 ? (
+                        <Text style={styles.noReviews}>No reviews yet. Be the first!</Text>
+                    ) : (
+                        reviews.map((r: any) => (
+                            <View key={r.id} style={styles.reviewCard}>
+                                <View style={styles.reviewHeader}>
+                                    <Text style={styles.reviewName}>{r.user?.name || r.name}</Text>
+                                    <View style={styles.starsRow}>
+                                        {[1,2,3,4,5].map(s => (
+                                            <Ionicons key={s} name="star" size={14} color={s <= r.rating ? '#FFD700' : '#ddd'} />
+                                        ))}
+                                    </View>
+                                </View>
+                                {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
+                            </View>
+                        ))
+                    )}
+
+                    {/* Submit Review — only for customers */}
+                    {user?.role === 'Customer' && (
+                        <View style={styles.reviewForm}>
+                            <Text style={styles.sectionTitle}>Leave a Review</Text>
+                            <View style={styles.starsRow}>
+                                {[1,2,3,4,5].map(s => (
+                                    <TouchableOpacity key={s} onPress={() => setMyRating(s)}>
+                                        <Ionicons name="star" size={32} color={s <= myRating ? '#FFD700' : '#ddd'} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            <TextInput
+                                style={styles.reviewInput}
+                                placeholder="Write a comment (optional)"
+                                value={myComment}
+                                onChangeText={setMyComment}
+                                multiline
+                                numberOfLines={3}
+                                placeholderTextColor="#aaa"
+                            />
+                            <TouchableOpacity
+                                style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+                                onPress={handleSubmitReview}
+                                disabled={submitting}
+                            >
+                                {submitting
+                                    ? <ActivityIndicator color="#fff" />
+                                    : <Text style={styles.submitBtnText}>Submit Review</Text>
+                                }
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
@@ -253,11 +335,25 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 8,
     },
-    addBtnText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
+    addBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    noReviews: { fontSize: 14, color: '#aaa', marginBottom: 16 },
+    reviewCard: {
+        backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12, marginBottom: 10,
     },
+    reviewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    reviewName: { fontSize: 14, fontWeight: '600', color: '#333' },
+    starsRow: { flexDirection: 'row', gap: 2 },
+    reviewComment: { fontSize: 13, color: '#666' },
+    reviewForm: { marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: '#eee' },
+    reviewInput: {
+        backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12,
+        fontSize: 14, color: '#333', borderWidth: 1, borderColor: '#eee',
+        marginTop: 12, marginBottom: 12, minHeight: 80, textAlignVertical: 'top',
+    },
+    submitBtn: {
+        backgroundColor: '#ff6b35', borderRadius: 10, padding: 14, alignItems: 'center',
+    },
+    submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });
 
 export default MealDetailScreen;

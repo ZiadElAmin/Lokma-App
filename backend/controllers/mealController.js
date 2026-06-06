@@ -5,14 +5,20 @@ import prisma from '../config/db.js';
 // @route   GET /api/meals
 // @access  Public
 const getMeals = asyncHandler(async (req, res) => {
+    const { search, cookId } = req.query;
     const meals = await prisma.meal.findMany({
+        where: {
+            cook: { isAvailable: true },
+            ...(cookId ? { cookId } : {}),
+            ...(search ? {
+                OR: [
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                ],
+            } : {}),
+        },
         include: {
-            cook: {
-                select: {
-                    id: true,
-                    name: true,
-                },
-            },
+            cook: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
     });
@@ -139,7 +145,7 @@ const deleteMeal = asyncHandler(async (req, res) => {
 });
 const getCooks = asyncHandler(async (req, res) => {
     const cooks = await prisma.user.findMany({
-        where: { role: 'Cook' },
+        where: { role: 'Cook', isAvailable: true },
         select: {
             id: true,
             name: true,
@@ -158,4 +164,50 @@ const getCooks = asyncHandler(async (req, res) => {
     res.json(cooks);
 });
 
-export { getMeals, getMealById, createMeal, updateMeal, deleteMeal, getCookMeals, getCooks };
+const createReview = asyncHandler(async (req, res) => {
+    const { rating, comment } = req.body;
+    const meal = await prisma.meal.findUnique({
+        where: { id: req.params.id },
+        include: { reviews: true },
+    });
+    if (!meal) { res.status(404); throw new Error('Meal not found'); }
+
+    const alreadyReviewed = meal.reviews.find(r => r.userId === req.user.id);
+    if (alreadyReviewed) { res.status(400); throw new Error('You already reviewed this meal'); }
+
+    if (!rating || rating < 1 || rating > 5) {
+        res.status(400); throw new Error('Rating must be between 1 and 5');
+    }
+
+    await prisma.review.create({
+        data: {
+            rating: Number(rating),
+            comment: comment || '',
+            userId: req.user.id,
+            mealId: req.params.id,
+            name: req.user.name,
+        },
+    });
+
+    // Recalculate meal rating
+    const allReviews = await prisma.review.findMany({ where: { mealId: req.params.id } });
+    const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+
+    await prisma.meal.update({
+        where: { id: req.params.id },
+        data: { rating: avgRating, numReviews: allReviews.length },
+    });
+
+    res.status(201).json({ message: 'Review added' });
+});
+
+const getMealReviews = asyncHandler(async (req, res) => {
+    const reviews = await prisma.review.findMany({
+        where: { mealId: req.params.id },
+        include: { user: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+    });
+    res.json(reviews);
+});
+
+export { getMeals, getMealById, createMeal, updateMeal, deleteMeal, getCookMeals, getCooks, createReview, getMealReviews };

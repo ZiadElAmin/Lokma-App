@@ -40,11 +40,9 @@ const CheckoutScreen = () => {
         };
 
         try {
-            await ordersApi.createOrder(order);
+            const createdOrder = await ordersApi.createOrder(order);
             clearCart();
-            Alert.alert('Success', 'Your order has been placed!', [
-                { text: 'OK', onPress: () => router.replace('/my-orders') }
-            ]);
+            router.replace(`/payment/${createdOrder.id}`);
         } catch (error) {
             Alert.alert('Error', 'Failed to place order. Please try again.');
             console.error(error);

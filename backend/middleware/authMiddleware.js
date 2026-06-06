@@ -80,4 +80,13 @@ const delivery = (req, res, next) => {
     }
 };
 
-export { protect, authorize, cook, admin, delivery };
+const rider = (req, res, next) => {
+    if (req.user && (req.user.role === 'Rider' || req.user.role === 'Admin')) {
+        next();
+    } else {
+        res.status(403);
+        throw new Error('Not authorized as a rider');
+    }
+};
+
+export { protect, authorize, cook, admin, delivery, rider };

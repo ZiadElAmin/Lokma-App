@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
     View, Text, StyleSheet, FlatList, ActivityIndicator,
     RefreshControl, TouchableOpacity, Alert
@@ -30,9 +31,11 @@ const CookOrdersScreen = () => {
         setRefreshing(false);
     };
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            fetchOrders();
+        }, [])
+    );
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -61,16 +64,29 @@ const CookOrdersScreen = () => {
         );
     };
 
+    const handleMarkReady = async (orderId: string) => {
+        try {
+            await ordersApi.markOrderReady(orderId);
+            fetchOrders();
+        } catch (err) {
+            Alert.alert('Error', 'Failed to mark order as ready');
+        }
+    };
+
     const getStatusText = (order: any) => {
         if (order.isDelivered) return 'Delivered';
+        if (order.isPickedUp) return 'With Rider';
         if (order.isRejected) return 'Rejected';
+        if (order.isReadyForPickup) return 'Ready for Pickup';
         if (order.isAccepted) return 'Accepted';
         return 'New Order';
     };
 
     const getStatusColor = (order: any) => {
         if (order.isDelivered) return '#4CAF50';
+        if (order.isPickedUp) return '#9C27B0';
         if (order.isRejected) return '#f44336';
+        if (order.isReadyForPickup) return '#009688';
         if (order.isAccepted) return '#2196F3';
         return '#FF9800';
     };
@@ -168,12 +184,26 @@ const CookOrdersScreen = () => {
                                         <Text style={styles.acceptBtnText}>Accept</Text>
                                     </TouchableOpacity>
                                 </View>
-                            ) : item.isAccepted ? (
-                                <View style={styles.acceptedBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                                    <Text style={styles.acceptedText}>
-                                        Accepted {item.aiVerified ? '· AI ✓' : ''}
-                                    </Text>
+                            ) : item.isAccepted && !item.isReadyForPickup ? (
+                                <View style={styles.actionButtons}>
+                                    <View style={styles.acceptedBadge}>
+                                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                                        <Text style={styles.acceptedText}>
+                                            Accepted {item.aiVerified ? '· AI ✓' : ''}
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={styles.readyBtn}
+                                        onPress={() => handleMarkReady(item.id)}
+                                    >
+                                        <Ionicons name="bag-check-outline" size={16} color="#fff" />
+                                        <Text style={styles.readyBtnText}>Ready</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : item.isReadyForPickup ? (
+                                <View style={styles.readyBadge}>
+                                    <Ionicons name="bicycle-outline" size={16} color="#fff" />
+                                    <Text style={styles.readyBtnText}>Awaiting Rider</Text>
                                 </View>
                             ) : (
                                 <View style={styles.rejectedBadge}>
@@ -242,6 +272,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4,
     },
     acceptedText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+    readyBtn: {
+        backgroundColor: '#009688', flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6,
+    },
+    readyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+    readyBadge: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#009688',
+        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4,
+    },
     rejectedBadge: {
         flexDirection: 'row', alignItems: 'center', backgroundColor: '#f44336',
         paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4,

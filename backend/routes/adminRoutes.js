@@ -67,11 +67,21 @@ router.route('/orders/:id')
         res.json({ message: 'Order deleted' });
     });
 
+router.route('/riders')
+    .get(protect, admin, async (req, res) => {
+        const riders = await prisma.user.findMany({
+            where: { role: 'Rider' },
+            select: { id: true, name: true, email: true, createdAt: true },
+        });
+        res.json(riders);
+    });
+
 router.route('/stats')
     .get(protect, admin, async (req, res) => {
-        const [userCount, cookCount, mealCount, orderCount, totalRevenue] = await Promise.all([
+        const [userCount, cookCount, riderCount, mealCount, orderCount, totalRevenue] = await Promise.all([
             prisma.user.count({ where: { role: 'Customer' } }),
             prisma.user.count({ where: { role: 'Cook' } }),
+            prisma.user.count({ where: { role: 'Rider' } }),
             prisma.meal.count(),
             prisma.order.count(),
             prisma.order.aggregate({ _sum: { totalPrice: true } }),
@@ -79,6 +89,7 @@ router.route('/stats')
         res.json({
             userCount,
             cookCount,
+            riderCount,
             mealCount,
             orderCount,
             totalRevenue: totalRevenue._sum.totalPrice || 0,

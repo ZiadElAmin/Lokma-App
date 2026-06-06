@@ -12,6 +12,7 @@ const AdminPanel = () => {
     const [stats, setStats] = useState(null);
     const [users, setUsers] = useState([]);
     const [cooks, setCooks] = useState([]);
+    const [riders, setRiders] = useState([]);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -24,15 +25,17 @@ const AdminPanel = () => {
 
     const fetchData = async () => {
         try {
-            const [statsData, usersData, cooksData, ordersData] = await Promise.all([
+            const [statsData, usersData, cooksData, ridersData, ordersData] = await Promise.all([
                 adminApi.getStats(),
                 adminApi.getAllUsers(),
                 adminApi.getAllCooks(),
+                adminApi.getAllRiders(),
                 adminApi.getAllOrders(),
             ]);
             setStats(statsData);
             setUsers(usersData);
             setCooks(cooksData);
+            setRiders(ridersData);
             setOrders(ordersData);
         } catch (err) {
             console.error(err);
@@ -111,6 +114,15 @@ const AdminPanel = () => {
         );
     };
 
+    const getRoleBadgeColor = (role) => {
+        switch (role) {
+            case 'Cook': return '#fff3e0';
+            case 'Rider': return '#f3e5f5';
+            case 'Admin': return '#fce4ec';
+            default: return '#e3f2fd';
+        }
+    };
+
     const getStatusColor = (isPaid, isDelivered) => {
         if (isDelivered) return '#4CAF50';
         if (isPaid) return '#2196F3';
@@ -144,6 +156,7 @@ const AdminPanel = () => {
         { key: 'stats', label: 'Overview', icon: 'analytics' },
         { key: 'users', label: 'Users', icon: 'people' },
         { key: 'cooks', label: 'Cooks', icon: 'restaurant' },
+        { key: 'riders', label: 'Riders', icon: 'bicycle' },
         { key: 'orders', label: 'Orders', icon: 'receipt' },
     ];
 
@@ -165,15 +178,22 @@ const AdminPanel = () => {
                             </View>
                         </View>
                         <View style={styles.statsRow}>
-                            <View style={[styles.statCard, { backgroundColor: '#e8f5e9' }]}>
-                                <Ionicons name="restaurant-menu" size={28} color="#4CAF50" />
-                                <Text style={styles.statValue}>{stats?.mealCount || 0}</Text>
-                                <Text style={styles.statLabel}>Meals</Text>
+                            <View style={[styles.statCard, { backgroundColor: '#f3e5f5' }]}>
+                                <Ionicons name="bicycle" size={28} color="#9C27B0" />
+                                <Text style={styles.statValue}>{stats?.riderCount || 0}</Text>
+                                <Text style={styles.statLabel}>Riders</Text>
                             </View>
                             <View style={[styles.statCard, { backgroundColor: '#fce4ec' }]}>
                                 <Ionicons name="receipt" size={28} color="#e91e63" />
                                 <Text style={styles.statValue}>{stats?.orderCount || 0}</Text>
                                 <Text style={styles.statLabel}>Orders</Text>
+                            </View>
+                        </View>
+                        <View style={styles.statsRow}>
+                            <View style={[styles.statCard, { backgroundColor: '#e8f5e9' }]}>
+                                <Ionicons name="fast-food" size={28} color="#4CAF50" />
+                                <Text style={styles.statValue}>{stats?.mealCount || 0}</Text>
+                                <Text style={styles.statLabel}>Meals</Text>
                             </View>
                         </View>
                         <View style={styles.revenueCard}>
@@ -201,6 +221,9 @@ const AdminPanel = () => {
                                     <Text style={styles.itemEmail}>{item.email}</Text>
                                 </View>
                                 <View style={styles.itemActions}>
+                                    <View style={[styles.roleBadge, { backgroundColor: getRoleBadgeColor(item.role) }]}>
+                                        <Text style={styles.roleBadgeText}>{item.role}</Text>
+                                    </View>
                                     <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteUser(item)}>
                                         <Ionicons name="trash" size={18} color="#ff4444" />
                                     </TouchableOpacity>
@@ -230,6 +253,37 @@ const AdminPanel = () => {
                                 <View style={styles.cookBadge}>
                                     <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
                                     <Text style={styles.cookBadgeText}>Cook</Text>
+                                </View>
+                            </View>
+                        )}
+                    />
+                );
+
+            case 'riders':
+                return (
+                    <FlatList
+                        data={riders}
+                        keyExtractor={(item) => item.id}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#ff6b35']} />}
+                        ListEmptyComponent={
+                            <View style={styles.emptyContainer}>
+                                <Text style={styles.emptyText}>No riders found</Text>
+                            </View>
+                        }
+                        renderItem={({ item }) => (
+                            <View style={styles.listItem}>
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.itemName}>{item.name}</Text>
+                                    <Text style={styles.itemEmail}>{item.email}</Text>
+                                </View>
+                                <View style={styles.itemActions}>
+                                    <View style={[styles.roleBadge, { backgroundColor: '#f3e5f5' }]}>
+                                        <Ionicons name="bicycle" size={14} color="#9C27B0" />
+                                        <Text style={[styles.roleBadgeText, { color: '#9C27B0' }]}>Rider</Text>
+                                    </View>
+                                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteUser(item)}>
+                                        <Ionicons name="trash" size={18} color="#ff4444" />
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                         )}
@@ -447,6 +501,20 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#4CAF50',
         fontWeight: '600',
+    },
+    roleBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 10,
+        gap: 4,
+        marginRight: 8,
+    },
+    roleBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#ff9800',
     },
     deleteBtn: {
         width: 36,

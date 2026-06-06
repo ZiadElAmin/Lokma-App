@@ -8,6 +8,8 @@ import {
     deleteMeal,
     getCookMeals,
     getCooks,
+    createReview,
+    getMealReviews,
 } from '../controllers/mealController.js';
 import { protect, cook } from '../middleware/authMiddleware.js';
 
@@ -19,5 +21,6 @@ router
     .get(getMealById)
     .put(protect, cook, updateMeal)
     .delete(protect, cook, deleteMeal);
+router.route('/:id/reviews').post(protect, createReview).get(getMealReviews);
 
 export default router;

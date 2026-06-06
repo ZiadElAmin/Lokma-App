@@ -15,6 +15,11 @@ const getAllCooks = async () => {
     return response.data;
 };
 
+const getAllRiders = async () => {
+    const response = await api.get('/admin/riders');
+    return response.data;
+};
+
 const getAllOrders = async () => {
     const response = await api.get('/admin/orders');
     return response.data;
@@ -37,6 +42,7 @@ export default {
     getStats,
     getAllUsers,
     getAllCooks,
+    getAllRiders,
     getAllOrders,
     deleteUser,
     deleteOrder,

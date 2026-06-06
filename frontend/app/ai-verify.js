@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
     Image, ActivityIndicator, Alert, ScrollView
@@ -15,11 +15,20 @@ export default function AIVerifyScreen() {
     const { orderId } = useLocalSearchParams();
     const router = useRouter();
     const cameraRef = useRef(null);
+    const timerRef = useRef(null); // Reference to store the interval ID
     const [permission, requestPermission] = useCameraPermissions();
     const [photo, setPhoto] = useState(null);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [showCamera, setShowCamera] = useState(false);
+    const [countdown, setCountdown] = useState(null); // State for the timer display
+
+    // Cleanup timer if component unmounts to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, []);
 
     const takePicture = async () => {
         if (cameraRef.current) {
@@ -27,6 +36,31 @@ export default function AIVerifyScreen() {
             setPhoto(photoData.uri);
             setShowCamera(false);
         }
+    };
+
+    const startTimerAndTakePicture = () => {
+        if (countdown !== null) return; // Prevent multiple presses resetting the timer
+
+        let timeLeft = 5;
+        setCountdown(timeLeft);
+
+        timerRef.current = setInterval(async () => {
+            timeLeft -= 1;
+            
+            if (timeLeft > 0) {
+                setCountdown(timeLeft);
+            } else {
+                clearInterval(timerRef.current);
+                setCountdown(null);
+                await takePicture();
+            }
+        }, 1000);
+    };
+
+    const handleCancelCamera = () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setCountdown(null);
+        setShowCamera(false);
     };
 
     const pickFromGallery = async () => {
@@ -102,11 +136,23 @@ export default function AIVerifyScreen() {
         return (
             <View style={styles.cameraContainer}>
                 <CameraView ref={cameraRef} style={styles.camera} facing="front" />
+                
+                {/* Countdown Display Overlay */}
+                {countdown !== null && (
+                    <View style={styles.countdownOverlay}>
+                        <Text style={styles.countdownText}>{countdown}</Text>
+                    </View>
+                )}
+
                 <View style={styles.cameraControls}>
-                    <TouchableOpacity style={styles.captureBtn} onPress={takePicture}>
+                    <TouchableOpacity 
+                        style={[styles.captureBtn, countdown !== null && styles.captureBtnDisabled]} 
+                        onPress={startTimerAndTakePicture}
+                        disabled={countdown !== null} // Disable button whilst timer is running
+                    >
                         <Ionicons name="camera" size={36} color="#fff" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCamera(false)}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelCamera}>
                         <Text style={styles.cancelText}>Cancel</Text>
                     </TouchableOpacity>
                 </View>
@@ -152,7 +198,7 @@ export default function AIVerifyScreen() {
             {loading && (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#ff6b35" />
-                    <Text style={styles.loadingText}>Analyzing your photo...</Text>
+                    <Text style={styles.loadingText}>Analysing your photo...</Text>
                 </View>
             )}
 
@@ -179,8 +225,27 @@ const styles = StyleSheet.create({
         backgroundColor: '#ff6b35', width: 80, height: 80,
         borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
     },
+    captureBtnDisabled: {
+        backgroundColor: '#ccc', // Dims the button whilst the timer is running
+    },
+    countdownOverlay: {
+        position: 'absolute',
+        top: '40%',
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    countdownText: {
+        fontSize: 100,
+        fontWeight: 'bold',
+        color: '#fff',
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: -1, height: 1 },
+        textShadowRadius: 10
+    },
     cancelBtn: { padding: 12 },
-    cancelText: { color: '#fff', fontSize: 16 },
+    cancelText: { color: '#fff', fontSize: 16, fontWeight: 'bold', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: { width: -1, height: 1 }, textShadowRadius: 5 },
     photoOptions: { width: '100%', gap: 16, marginBottom: 24 },
     photoOptionBtn: {
         backgroundColor: '#ff6b35', flexDirection: 'row', alignItems: 'center',

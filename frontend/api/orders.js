@@ -35,8 +35,43 @@ const getOrderById = async (id) => {
     return response.data;
 };
 
+const updateOrderToPaid = async (id, paymentResult) => {
+    const response = await api.put(`/orders/${id}/pay`, paymentResult);
+    return response.data;
+};
+
 const updateOrderStatus = async (id, status) => {
     const response = await api.put(`/orders/${id}/status`, { status });
+    return response.data;
+};
+
+const markOrderReady = async (id) => {
+    const response = await api.put(`/orders/${id}/ready`);
+    return response.data;
+};
+
+const getAvailableOrders = async () => {
+    const response = await api.get('/orders/available');
+    return response.data;
+};
+
+const claimOrder = async (id) => {
+    const response = await api.put(`/orders/${id}/claim`);
+    return response.data;
+};
+
+const pickupOrder = async (id) => {
+    const response = await api.put(`/orders/${id}/pickup`);
+    return response.data;
+};
+
+const deliverOrder = async (id) => {
+    const response = await api.put(`/orders/${id}/deliver`);
+    return response.data;
+};
+
+const getRiderOrders = async () => {
+    const response = await api.get('/orders/riderorders');
     return response.data;
 };
 
@@ -48,5 +83,12 @@ export default {
     acceptOrder,
     rejectOrder,
     getOrderById,
+    updateOrderToPaid,
     updateOrderStatus,
+    markOrderReady,
+    getAvailableOrders,
+    claimOrder,
+    pickupOrder,
+    deliverOrder,
+    getRiderOrders,
 };

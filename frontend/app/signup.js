@@ -95,20 +95,28 @@ const SignupScreen = () => {
 
                     <Text style={styles.roleLabel}>I am a:</Text>
                     <View style={styles.roleContainer}>
-                        <TouchableOpacity 
-                            style={[styles.roleBtn, role === 'Customer' && styles.roleBtnActive]} 
+                        <TouchableOpacity
+                            style={[styles.roleBtn, role === 'Customer' && styles.roleBtnActive]}
                             onPress={() => setRole('Customer')}
                         >
                             <Ionicons name="person" size={24} color={role === 'Customer' ? '#fff' : '#666'} />
                             <Text style={[styles.roleBtnText, role === 'Customer' && styles.roleBtnTextActive]}>Customer</Text>
                         </TouchableOpacity>
-                        
-                        <TouchableOpacity 
-                            style={[styles.roleBtn, role === 'Cook' && styles.roleBtnActive]} 
+
+                        <TouchableOpacity
+                            style={[styles.roleBtn, role === 'Cook' && styles.roleBtnActive]}
                             onPress={() => setRole('Cook')}
                         >
                             <Ionicons name="restaurant" size={24} color={role === 'Cook' ? '#fff' : '#666'} />
                             <Text style={[styles.roleBtnText, role === 'Cook' && styles.roleBtnTextActive]}>Cook</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.roleBtn, role === 'Rider' && styles.roleBtnActive]}
+                            onPress={() => setRole('Rider')}
+                        >
+                            <Ionicons name="bicycle" size={24} color={role === 'Rider' ? '#fff' : '#666'} />
+                            <Text style={[styles.roleBtnText, role === 'Rider' && styles.roleBtnTextActive]}>Rider</Text>
                         </TouchableOpacity>
                     </View>
 

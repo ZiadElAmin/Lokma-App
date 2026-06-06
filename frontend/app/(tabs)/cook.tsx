@@ -27,6 +27,8 @@ const CookDashboard = () => {
     const router = useRouter();
     const [meals, setMeals] = useState<Meal[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAvailable, setIsAvailable] = useState(true);
+    const [togglingAvailability, setTogglingAvailability] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
@@ -57,6 +59,17 @@ const CookDashboard = () => {
             console.error(err);
         }
         setLoading(false);
+    };
+
+    const handleToggleAvailability = async () => {
+        setTogglingAvailability(true);
+        try {
+            const res = await import('../../api/client').then(m => m.default.put('/users/availability'));
+            setIsAvailable(res.data.isAvailable);
+        } catch {
+            Alert.alert('Error', 'Could not update availability');
+        }
+        setTogglingAvailability(false);
     };
 
     const calculatePrice = () => {
@@ -201,8 +214,18 @@ const CookDashboard = () => {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>My Kitchen</Text>
-                <Text style={styles.headerSubtitle}>{meals.length} meals</Text>
+                <View>
+                    <Text style={styles.headerTitle}>My Kitchen</Text>
+                    <Text style={styles.headerSubtitle}>{meals.length} meals</Text>
+                </View>
+                <TouchableOpacity
+                    style={[styles.availabilityToggle, { backgroundColor: isAvailable ? '#4CAF50' : '#f44336' }]}
+                    onPress={handleToggleAvailability}
+                    disabled={togglingAvailability}
+                >
+                    <Ionicons name={isAvailable ? 'checkmark-circle' : 'close-circle'} size={16} color="#fff" />
+                    <Text style={styles.availabilityText}>{isAvailable ? 'Open' : 'Closed'}</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.actionBar}>
@@ -444,7 +467,15 @@ const styles = StyleSheet.create({
         padding: 20,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
+    availabilityToggle: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    },
+    availabilityText: { color: '#fff', fontWeight: '700', fontSize: 13 },
     headerTitle: {
         fontSize: 24,
         fontWeight: '800',

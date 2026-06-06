@@ -3,7 +3,7 @@ import generateToken from '../utils/generateToken.js';
 import prisma from '../config/db.js';
 import bcrypt from 'bcryptjs';
 
-const VALID_ROLES = ['Customer', 'Cook', 'Admin'];
+const VALID_ROLES = ['Customer', 'Cook', 'Rider', 'Admin'];
 
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -127,4 +127,23 @@ const getUserProfile = asyncHandler(async (req, res) => {
     }
 });
 
-export { authUser, registerUser, getUserProfile };
+const toggleAvailability = asyncHandler(async (req, res) => {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) { res.status(404); throw new Error('User not found'); }
+    const updated = await prisma.user.update({
+        where: { id: req.user.id },
+        data: { isAvailable: !user.isAvailable },
+    });
+    res.json({ isAvailable: updated.isAvailable });
+});
+
+const savePushToken = asyncHandler(async (req, res) => {
+    const { token } = req.body;
+    await prisma.user.update({
+        where: { id: req.user.id },
+        data: { pushToken: token },
+    });
+    res.json({ message: 'Push token saved' });
+});
+
+export { authUser, registerUser, getUserProfile, toggleAvailability, savePushToken };
