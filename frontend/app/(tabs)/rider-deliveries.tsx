@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, FlatList, ActivityIndicator,
-    RefreshControl, TouchableOpacity, Alert
+    RefreshControl, TouchableOpacity, Alert, Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import ordersApi from '../../api/orders';
+import api from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
 import API_BASE_URL from '../../config';
 
@@ -18,6 +20,8 @@ export default function RiderDeliveriesScreen() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [earnings, setEarnings] = useState<{ totalEarnings: number; completedDeliveries: number } | null>(null);
+    const [riderLocation, setRiderLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const socketRef = useRef<any>(null);
     const locationSubRef = useRef<any>(null);
 
@@ -34,13 +38,14 @@ export default function RiderDeliveriesScreen() {
         locationSubRef.current = await Location.watchPositionAsync(
             { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
             (loc) => {
-                socketRef.current?.emit('rider_location', {
-                    orderId,
-                    latitude: loc.coords.latitude,
-                    longitude: loc.coords.longitude,
-                });
+                const { latitude, longitude } = loc.coords;
+                setRiderLocation({ latitude, longitude });
+                socketRef.current?.emit('rider_location', { orderId, latitude, longitude });
             }
         );
+        // Get initial position immediately
+        const initial = await Location.getCurrentPositionAsync({});
+        setRiderLocation({ latitude: initial.coords.latitude, longitude: initial.coords.longitude });
     };
 
     const stopLocationBroadcast = () => {
@@ -56,8 +61,12 @@ export default function RiderDeliveriesScreen() {
 
     const fetchOrders = async () => {
         try {
-            const data = await ordersApi.getRiderOrders();
+            const [data, earningsData] = await Promise.all([
+                ordersApi.getRiderOrders(),
+                api.get('/orders/rider-earnings').then(r => r.data).catch(() => null),
+            ]);
             setOrders(data);
+            if (earningsData) setEarnings(earningsData);
         } catch (err) {
             console.error(err);
         }
@@ -133,6 +142,20 @@ export default function RiderDeliveriesScreen() {
                 <Text style={styles.headerSubtitle}>{orders.length} total</Text>
             </View>
 
+            {earnings && (
+                <View style={styles.earningsCard}>
+                    <View style={styles.earningsStat}>
+                        <Text style={styles.earningsValue}>EGP {earnings.totalEarnings.toFixed(2)}</Text>
+                        <Text style={styles.earningsLabel}>Total Earned</Text>
+                    </View>
+                    <View style={styles.earningsDivider} />
+                    <View style={styles.earningsStat}>
+                        <Text style={styles.earningsValue}>{earnings.completedDeliveries}</Text>
+                        <Text style={styles.earningsLabel}>Deliveries Done</Text>
+                    </View>
+                </View>
+            )}
+
             {orders.length === 0 ? (
                 <View style={styles.center}>
                     <Ionicons name="cube-outline" size={80} color="#ccc" />
@@ -158,6 +181,16 @@ export default function RiderDeliveriesScreen() {
                                 <Ionicons name="person-outline" size={14} color="#666" />
                                 <Text style={styles.detail}>{item.user?.name}</Text>
                             </View>
+                            {item.user?.phone && (
+                                <TouchableOpacity
+                                    style={styles.phoneRow}
+                                    onPress={() => Linking.openURL(`tel:${item.user.phone}`)}
+                                >
+                                    <Ionicons name="call-outline" size={14} color="#4CAF50" />
+                                    <Text style={styles.phoneText}>{item.user.phone}</Text>
+                                    <Text style={styles.callLabel}>Tap to call</Text>
+                                </TouchableOpacity>
+                            )}
                             <View style={styles.row}>
                                 <Ionicons name="location-outline" size={14} color="#666" />
                                 <Text style={styles.detail} numberOfLines={2}>{item.shippingAddress}</Text>
@@ -168,6 +201,143 @@ export default function RiderDeliveriesScreen() {
                                     <Text key={oi.id} style={styles.itemText}>• {oi.qty}x {oi.name}</Text>
                                 ))}
                             </View>
+
+                            {/* Navigation map to COOK — shown before pickup */}
+                            {!item.isPickedUp && !item.isDelivered && (() => {
+                                const cook = item.orderItems?.[0]?.meal?.cook;
+                                return cook?.cookLat ? (
+                                    <View style={styles.mapContainer}>
+                                        <Text style={styles.mapLabel}>🍳 Navigate to cook for pickup</Text>
+                                        <WebView
+                                            style={styles.map}
+                                            originWhitelist={['*']}
+                                            source={{ html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>html,body,#map{height:100%;margin:0;padding:0;}</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var cookLat = ${cook.cookLat};
+  var cookLng = ${cook.cookLng};
+  var riderLat = ${riderLocation?.latitude || cook.cookLat};
+  var riderLng = ${riderLocation?.longitude || cook.cookLng};
+  var map = L.map('map').setView([cookLat, cookLng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(map);
+  var cookIcon = L.divIcon({html:'<div style="font-size:28px;">🍳</div>',iconSize:[28,28],iconAnchor:[14,28],className:''});
+  L.marker([cookLat, cookLng], {icon:cookIcon}).addTo(map).bindPopup('${(cook.name || 'Cook').replace(/'/g, "\\'")}');
+  var riderIcon = L.divIcon({html:'<div style="font-size:26px;">🛵</div>',iconSize:[26,26],iconAnchor:[13,13],className:''});
+  L.marker([riderLat, riderLng], {icon:riderIcon}).addTo(map).bindPopup('You');
+  var bounds = L.latLngBounds([[riderLat,riderLng],[cookLat,cookLng]]);
+  map.fitBounds(bounds, {padding:[40,40]});
+  fetch('https://router.project-osrm.org/route/v1/driving/'+riderLng+','+riderLat+';'+cookLng+','+cookLat+'?overview=full&geometries=geojson')
+  .then(r=>r.json()).then(data=>{
+    if(data.routes&&data.routes[0]){
+      var route=data.routes[0];
+      L.geoJSON(route.geometry,{style:{color:'#2196F3',weight:4,opacity:0.9}}).addTo(map);
+      var mins=Math.ceil(route.duration/60); var dist=(route.distance/1000).toFixed(1);
+      var eta=L.control({position:'bottomleft'});
+      eta.onAdd=function(){var d=L.DomUtil.create('div');d.style='background:white;padding:8px 12px;border-radius:10px;font-family:sans-serif;font-size:13px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.2)';d.innerHTML='⏱ ~'+mins+' min | '+dist+' km';return d;};
+      eta.addTo(map);
+      var nav=L.control({position:'topright'});
+      nav.onAdd=function(){var d=L.DomUtil.create('div');d.style='background:#2196F3;padding:8px 12px;border-radius:8px;cursor:pointer;font-family:sans-serif;font-size:12px;color:white;font-weight:bold;';d.innerHTML='🗺 Navigate';d.onclick=function(){window.open('https://www.google.com/maps/dir/'+riderLat+','+riderLng+'/'+cookLat+','+cookLng);};return d;};
+      nav.addTo(map);
+    }
+  }).catch(function(){});
+</script>
+</body>
+</html>`}}
+                                            javaScriptEnabled
+                                        />
+                                    </View>
+                                ) : null;
+                            })()}
+
+                            {/* Navigation map to CUSTOMER — shown when on the way to customer */}
+                            {item.isPickedUp && !item.isDelivered && item.deliveryLat && (
+                                <View style={styles.mapContainer}>
+                                    <Text style={styles.mapLabel}>📍 Navigate to customer</Text>
+                                    <WebView
+                                        style={styles.map}
+                                        originWhitelist={['*']}
+                                        source={{ html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>html,body,#map{height:100%;margin:0;padding:0;}</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var destLat = ${item.deliveryLat};
+  var destLng = ${item.deliveryLng};
+  var riderLat = ${riderLocation?.latitude || item.deliveryLat};
+  var riderLng = ${riderLocation?.longitude || item.deliveryLng};
+
+  var map = L.map('map').setView([destLat, destLng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution:'© OpenStreetMap'}).addTo(map);
+
+  // Customer pin
+  var destIcon = L.divIcon({html:'<div style="font-size:28px;">📍</div>',iconSize:[28,28],iconAnchor:[14,28],className:''});
+  L.marker([destLat, destLng], {icon:destIcon}).addTo(map).bindPopup("Customer's location");
+
+  // Rider pin
+  var riderIcon = L.divIcon({html:'<div style="font-size:26px;">🛵</div>',iconSize:[26,26],iconAnchor:[13,13],className:''});
+  var riderMarker = L.marker([riderLat, riderLng], {icon:riderIcon}).addTo(map).bindPopup("You");
+
+  // Fit both on screen
+  var bounds = L.latLngBounds([[riderLat,riderLng],[destLat,destLng]]);
+  map.fitBounds(bounds, {padding:[40,40]});
+
+  // Draw route via OSRM
+  fetch('https://router.project-osrm.org/route/v1/driving/'
+    +riderLng+','+riderLat+';'+destLng+','+destLat
+    +'?overview=full&geometries=geojson')
+  .then(r=>r.json()).then(data=>{
+    if(data.routes && data.routes[0]){
+      var route = data.routes[0];
+      L.geoJSON(route.geometry,{style:{color:'#ff6b35',weight:4,opacity:0.9}}).addTo(map);
+      var mins = Math.ceil(route.duration/60);
+      var dist = (route.distance/1000).toFixed(1);
+      var eta = L.control({position:'bottomleft'});
+      eta.onAdd = function(){
+        var d = L.DomUtil.create('div');
+        d.style='background:white;padding:8px 12px;border-radius:10px;font-family:sans-serif;font-size:13px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.2)';
+        d.innerHTML='⏱ ~'+mins+' min &nbsp;|&nbsp; '+dist+' km';
+        return d;
+      };
+      eta.addTo(map);
+
+      // Open in Google Maps button
+      var nav = L.control({position:'topright'});
+      nav.onAdd = function(){
+        var d = L.DomUtil.create('div');
+        d.style='background:#ff6b35;padding:8px 12px;border-radius:8px;cursor:pointer;font-family:sans-serif;font-size:12px;color:white;font-weight:bold;';
+        d.innerHTML='🗺 Google Maps';
+        d.onclick = function(){
+          window.open('https://www.google.com/maps/dir/'+riderLat+','+riderLng+'/'+destLat+','+destLng);
+        };
+        return d;
+      };
+      nav.addTo(map);
+    }
+  }).catch(function(){});
+</script>
+</body>
+</html>
+                                        `}}
+                                        javaScriptEnabled
+                                    />
+                                </View>
+                            )}
 
                             <View style={styles.cardFooter}>
                                 <Text style={styles.price}>EGP {item.totalPrice.toFixed(2)}</Text>
@@ -205,6 +375,16 @@ const styles = StyleSheet.create({
     header: { backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
     headerTitle: { fontSize: 24, fontWeight: '800', color: '#1a1a1a' },
     headerSubtitle: { fontSize: 14, color: '#888', marginTop: 4 },
+    earningsCard: {
+        flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16,
+        marginTop: 12, borderRadius: 14, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
+    },
+    earningsStat: { flex: 1, alignItems: 'center' },
+    earningsValue: { fontSize: 20, fontWeight: '800', color: '#2196F3' },
+    earningsLabel: { fontSize: 12, color: '#888', marginTop: 2 },
+    earningsDivider: { width: 1, backgroundColor: '#eee', marginVertical: 4 },
     list: { padding: 16 },
     card: {
         backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12,
@@ -217,6 +397,15 @@ const styles = StyleSheet.create({
     badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
     row: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4 },
     detail: { fontSize: 14, color: '#555', flex: 1 },
+    mapContainer: { marginBottom: 12 },
+    mapLabel: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6 },
+    map: { width: '100%', height: 220, borderRadius: 10, overflow: 'hidden' },
+    phoneRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: '#f0faf0', borderRadius: 8, padding: 8, marginBottom: 6,
+    },
+    phoneText: { fontSize: 14, color: '#4CAF50', fontWeight: '600', flex: 1 },
+    callLabel: { fontSize: 11, color: '#4CAF50' },
     itemsList: { marginTop: 8, marginBottom: 12 },
     itemText: { fontSize: 13, color: '#444', marginBottom: 2 },
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' },

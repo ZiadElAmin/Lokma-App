@@ -8,11 +8,14 @@ import { Ionicons } from '@expo/vector-icons';
 import mealsApi from '../../api/meals';
 import { useCart } from '../../hooks/useCart';
 
+const CATEGORIES = ['Egyptian', 'Grilled', 'Vegetarian', 'Seafood', 'Pasta', 'Sandwiches', 'Desserts', 'Soups', 'Other'];
+
 const MealsScreen = () => {
     const router = useRouter();
     const [meals, setMeals] = useState([]);
     const [cooks, setCooks] = useState([]);
     const [selectedCook, setSelectedCook] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -23,7 +26,7 @@ const MealsScreen = () => {
         try {
             setError(null);
             const [mealsData, cooksData] = await Promise.all([
-                mealsApi.getMeals(searchTerm, selectedCook || ''),
+                mealsApi.getMeals(searchTerm, selectedCook || '', selectedCategory || ''),
                 mealsApi.getCooks(),
             ]);
             setMeals(mealsData);
@@ -40,7 +43,7 @@ const MealsScreen = () => {
     useEffect(() => {
         const timer = setTimeout(() => fetchData(search), 400);
         return () => clearTimeout(timer);
-    }, [search, selectedCook]);
+    }, [search, selectedCook, selectedCategory]);
 
     // Auto refresh every time the screen comes into focus
     useFocusEffect(
@@ -130,6 +133,29 @@ const MealsScreen = () => {
                     </TouchableOpacity>
                 )}
             </View>
+
+            {/* Category Filter */}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryScrollContent}
+            >
+                <TouchableOpacity
+                    style={[styles.categoryChip, !selectedCategory && styles.categoryChipActive]}
+                    onPress={() => setSelectedCategory(null)}
+                >
+                    <Text style={[styles.categoryChipText, !selectedCategory && styles.categoryChipTextActive]}>All</Text>
+                </TouchableOpacity>
+                {CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                        key={cat}
+                        style={[styles.categoryChip, selectedCategory === cat && styles.categoryChipActive]}
+                        onPress={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+                    >
+                        <Text style={[styles.categoryChipText, selectedCategory === cat && styles.categoryChipTextActive]}>{cat}</Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
 
             {/* Cooks Section */}
             <View style={styles.sectionHeader}>
@@ -227,6 +253,11 @@ const MealsScreen = () => {
                                     <Text style={styles.cookBadgeText}>By {item.cook.name}</Text>
                                 </View>
                             )}
+                            {item.category && item.category !== 'Other' && (
+                                <View style={styles.categoryTag}>
+                                    <Text style={styles.categoryTagText}>{item.category}</Text>
+                                </View>
+                            )}
                             <Text style={styles.mealDesc} numberOfLines={1}>{item.description}</Text>
                             <View style={styles.mealFooter}>
                                 <View style={styles.priceContainer}>
@@ -293,6 +324,14 @@ const styles = StyleSheet.create({
     },
     searchIcon: { marginRight: 8 },
     searchInput: { flex: 1, fontSize: 15, color: '#333' },
+    categoryScrollContent: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+    categoryChip: {
+        paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+        backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: '#e0e0e0',
+    },
+    categoryChipActive: { backgroundColor: '#333', borderColor: '#333' },
+    categoryChipText: { fontSize: 13, fontWeight: '600', color: '#555' },
+    categoryChipTextActive: { color: '#fff' },
     cooksScrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
     cookChip: {
         flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -330,6 +369,11 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start', marginBottom: 4, gap: 4,
     },
     cookBadgeText: { fontSize: 11, color: '#ff9800', fontWeight: '600' },
+    categoryTag: {
+        backgroundColor: '#f0f4ff', paddingHorizontal: 8, paddingVertical: 2,
+        borderRadius: 8, alignSelf: 'flex-start', marginBottom: 4,
+    },
+    categoryTagText: { fontSize: 10, color: '#4a6fa5', fontWeight: '600' },
     mealDesc: { fontSize: 12, color: '#aaa', marginBottom: 8 },
     mealFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     priceContainer: { flexDirection: 'row', alignItems: 'center' },

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ProfileScreen = () => {
     const router = useRouter();
-    const { user, logout } = useAuth();
+    const { user, logout, deleteAccount } = useAuth();
 
     const handleLogout = () => {
         Alert.alert(
@@ -15,24 +15,37 @@ const ProfileScreen = () => {
             'Are you sure you want to logout?',
             [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                    text: 'Logout', 
+                { text: 'Logout', style: 'destructive', onPress: logout },
+            ]
+        );
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            'Delete Account',
+            'This will permanently delete your account and all your data. This cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete Forever',
                     style: 'destructive',
-                    onPress: () => {
-                        logout();
-                    }
+                    onPress: async () => {
+                        try {
+                            await deleteAccount();
+                        } catch (e: any) {
+                            Alert.alert('Error', e.message);
+                        }
+                    },
                 },
             ]
         );
     };
 
     const menuItems = [
-        { icon: 'person-outline', label: 'My Profile', onPress: () => {} },
+        { icon: 'person-outline', label: 'My Profile', onPress: () => router.push('/edit-profile') },
         { icon: 'receipt-outline', label: 'My Orders', onPress: () => router.push('/my-orders') },
-        { icon: 'location-outline', label: 'Delivery Address', onPress: () => {} },
+        { icon: 'location-outline', label: 'Delivery Addresses', onPress: () => router.push('/addresses') },
         { icon: 'card-outline', label: 'Payment Methods', onPress: () => {} },
-        { icon: 'settings-outline', label: 'Settings', onPress: () => {} },
-        { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => {} },
     ];
 
     const adminMenuItems = [
@@ -54,9 +67,18 @@ const ProfileScreen = () => {
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <View style={styles.header}>
-                <View style={styles.avatar}>
-                    <Ionicons name="person" size={40} color="#fff" />
-                </View>
+                <TouchableOpacity onPress={() => router.push('/edit-profile')} style={styles.avatarWrapper}>
+                    {user?.avatar ? (
+                        <Image source={{ uri: user.avatar }} style={styles.avatarImage} />
+                    ) : (
+                        <View style={styles.avatar}>
+                            <Ionicons name="person" size={40} color="#fff" />
+                        </View>
+                    )}
+                    <View style={styles.editBadge}>
+                        <Ionicons name="camera" size={12} color="#fff" />
+                    </View>
+                </TouchableOpacity>
                 <Text style={styles.name}>{user?.name || 'User'}</Text>
                 <Text style={styles.email}>{user?.email || ''}</Text>
                 <View style={[styles.roleBadge, { backgroundColor: roleStyle.backgroundColor }]}>
@@ -102,6 +124,11 @@ const ProfileScreen = () => {
             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
                 <Ionicons name="log-out-outline" size={22} color="#ff4444" />
                 <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteAccount}>
+                <Ionicons name="trash-outline" size={20} color="#c00" />
+                <Text style={styles.deleteText}>Delete Account</Text>
             </TouchableOpacity>
 
             <Text style={styles.version}>Version 1.0.0</Text>
@@ -172,6 +199,14 @@ const styles = StyleSheet.create({
         color: '#333',
         marginLeft: 16,
     },
+    avatarWrapper: { position: 'relative', marginBottom: 16 },
+    avatarImage: { width: 80, height: 80, borderRadius: 40 },
+    editBadge: {
+        position: 'absolute', bottom: 0, right: 0,
+        backgroundColor: '#ff6b35', width: 22, height: 22,
+        borderRadius: 11, justifyContent: 'center', alignItems: 'center',
+        borderWidth: 2, borderColor: '#fff',
+    },
     logoutBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -186,11 +221,22 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#ff4444',
     },
+    deleteBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        gap: 8,
+    },
+    deleteText: {
+        fontSize: 14,
+        color: '#c00',
+    },
     version: {
         textAlign: 'center',
         color: '#999',
         fontSize: 12,
-        marginTop: 24,
+        marginTop: 8,
     },
 });
 

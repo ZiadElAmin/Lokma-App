@@ -1,9 +1,10 @@
 import asyncHandler from 'express-async-handler';
 import prisma from '../config/db.js';
 import { sendPushNotification } from '../utils/notifications.js';
+import Stripe from 'stripe';
 
 const addOrderItems = asyncHandler(async (req, res) => {
-    const { orderItems, shippingAddress, paymentMethod, itemsPrice, taxPrice, shippingPrice, totalPrice } = req.body;
+    const { orderItems, shippingAddress, paymentMethod, itemsPrice, taxPrice, shippingPrice, totalPrice, deliveryLat, deliveryLng } = req.body;
     if (orderItems && orderItems.length === 0) {
         res.status(400);
         throw new Error('No order items');
@@ -16,6 +17,8 @@ const addOrderItems = asyncHandler(async (req, res) => {
             taxPrice,
             shippingPrice,
             totalPrice,
+            deliveryLat: deliveryLat || null,
+            deliveryLng: deliveryLng || null,
             orderItems: {
                 create: orderItems.map((item) => ({
                     name: item.name,
@@ -51,7 +54,7 @@ const getOrderById = asyncHandler(async (req, res) => {
     const order = await prisma.order.findUnique({
         where: { id: req.params.id },
         include: {
-            user: { select: { name: true, email: true } },
+            user: { select: { name: true, email: true, phone: true } },
             orderItems: true,
         },
     });
@@ -118,7 +121,7 @@ const getCookOrders = asyncHandler(async (req, res) => {
             orderItems: {
                 include: { meal: true },
             },
-            user: { select: { name: true, email: true } },
+            user: { select: { name: true, email: true, phone: true } },
         },
         orderBy: { createdAt: 'desc' },
     });
@@ -188,6 +191,19 @@ const markOrderReady = asyncHandler(async (req, res) => {
             { orderId: order.id }
         );
     }
+    // Notify all available riders
+    const availableRiders = await prisma.user.findMany({
+        where: { role: 'Rider', isAvailable: true, pushToken: { not: null } },
+        select: { pushToken: true },
+    });
+    if (availableRiders.length > 0) {
+        await sendPushNotification(
+            availableRiders.map(r => r.pushToken),
+            '🛵 New Delivery Available!',
+            'A new order is ready for pickup. Tap to claim it.',
+            { orderId: order.id }
+        );
+    }
     res.json(updated);
 });
 
@@ -201,7 +217,15 @@ const getAvailableOrders = asyncHandler(async (req, res) => {
             isDelivered: false,
         },
         include: {
-            orderItems: { include: { meal: true } },
+            orderItems: {
+                include: {
+                    meal: {
+                        include: {
+                            cook: { select: { name: true, cookLat: true, cookLng: true, cookAddress: true } },
+                        },
+                    },
+                },
+            },
             user: { select: { name: true } },
         },
         orderBy: { readyAt: 'asc' },
@@ -281,12 +305,35 @@ const getRiderOrders = asyncHandler(async (req, res) => {
     const orders = await prisma.order.findMany({
         where: { riderId: req.user.id },
         include: {
-            orderItems: { include: { meal: true } },
-            user: { select: { name: true } },
+            orderItems: {
+                include: {
+                    meal: {
+                        include: {
+                            cook: { select: { name: true, cookLat: true, cookLng: true, cookAddress: true } },
+                        },
+                    },
+                },
+            },
+            user: { select: { name: true, phone: true } },
         },
         orderBy: { updatedAt: 'desc' },
     });
     res.json(orders);
+});
+
+const createPaymentIntent = asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+    if (order.userId !== req.user.id) { res.status(403); throw new Error('Not authorized'); }
+    if (order.isPaid) { res.status(400); throw new Error('Order already paid'); }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(order.totalPrice * 100), // piastres
+        currency: 'egp',
+        metadata: { orderId: order.id },
+    });
+    res.json({ clientSecret: paymentIntent.client_secret });
 });
 
 const deleteOrder = asyncHandler(async (req, res) => {
@@ -311,8 +358,74 @@ const deleteOrder = asyncHandler(async (req, res) => {
 
     res.json({ message: 'Order deleted successfully' });
 });
+const getCookEarnings = asyncHandler(async (req, res) => {
+    const items = await prisma.orderItem.findMany({
+        where: {
+            meal: { cookId: req.user.id },
+            order: { isDelivered: true },
+        },
+        select: { price: true, qty: true },
+    });
+    const totalEarnings = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const completedOrders = await prisma.order.count({
+        where: {
+            isDelivered: true,
+            orderItems: { some: { meal: { cookId: req.user.id } } },
+        },
+    });
+    res.json({ totalEarnings, completedOrders });
+});
+
+const getRiderEarnings = asyncHandler(async (req, res) => {
+    const result = await prisma.order.aggregate({
+        where: { riderId: req.user.id, isDelivered: true },
+        _sum: { shippingPrice: true },
+        _count: { id: true },
+    });
+    res.json({
+        totalEarnings: result._sum.shippingPrice || 0,
+        completedDeliveries: result._count.id || 0,
+    });
+});
+
+const cancelOrder = asyncHandler(async (req, res) => {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order) { res.status(404); throw new Error('Order not found'); }
+    if (order.userId !== req.user.id) { res.status(403); throw new Error('Not authorized'); }
+    if (order.isAccepted) { res.status(400); throw new Error('Cannot cancel — cook has already accepted this order'); }
+    if (order.isCancelled) { res.status(400); throw new Error('Order is already cancelled'); }
+
+    const updated = await prisma.order.update({
+        where: { id: req.params.id },
+        data: { isCancelled: true },
+    });
+
+    // Notify cook if relevant
+    const cookIds = [...new Set(
+        (await prisma.orderItem.findMany({
+            where: { orderId: order.id },
+            include: { meal: { select: { cookId: true } } },
+        })).map(i => i.meal.cookId)
+    )];
+    const cooks = await prisma.user.findMany({
+        where: { id: { in: cookIds }, pushToken: { not: null } },
+        select: { pushToken: true },
+    });
+    if (cooks.length > 0) {
+        await sendPushNotification(
+            cooks.map(c => c.pushToken),
+            '❌ Order Cancelled',
+            'A customer cancelled their order.',
+            { orderId: order.id }
+        );
+    }
+
+    res.json(updated);
+});
+
 export {
     addOrderItems, getOrderById, updateOrderToPaid, getMyOrders, getCookOrders,
-    acceptOrder, rejectOrder, deleteOrder,
+    acceptOrder, rejectOrder, deleteOrder, createPaymentIntent,
     markOrderReady, getAvailableOrders, claimOrder, pickupOrder, deliverOrder, getRiderOrders,
+    cancelOrder, getCookEarnings, getRiderEarnings,
 };

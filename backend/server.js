@@ -7,6 +7,7 @@ import userRoutes from './routes/userRoutes.js';
 import mealRoutes from './routes/mealRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import addressRoutes from './routes/addressRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 
 console.log('Starting server setup...');
@@ -59,6 +60,7 @@ try {
     app.use('/api/meals', mealRoutes);
     app.use('/api/orders', orderRoutes);
     app.use('/api/admin', adminRoutes);
+    app.use('/api/addresses', addressRoutes);
     console.log('Routes configured.');
 
     app.use(notFound);

@@ -113,9 +113,29 @@ export default function RiderAvailableScreen() {
                                 <Ionicons name="person-outline" size={14} color="#666" />
                                 <Text style={styles.detail}>{item.user?.name}</Text>
                             </View>
+
+                            {/* Cook pickup location */}
+                            {(() => {
+                                const cook = item.orderItems?.[0]?.meal?.cook;
+                                return cook ? (
+                                    <View style={styles.cookRow}>
+                                        <Ionicons name="restaurant-outline" size={14} color="#ff6b35" />
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={styles.cookLabel}>Pickup from: {cook.name}</Text>
+                                            {cook.cookAddress
+                                                ? <Text style={styles.cookAddress}>{cook.cookAddress}</Text>
+                                                : !cook.cookLat
+                                                    ? <Text style={styles.cookNoLocation}>⚠️ Cook hasn't set location yet</Text>
+                                                    : <Text style={styles.cookAddress}>{cook.cookLat?.toFixed(4)}, {cook.cookLng?.toFixed(4)}</Text>
+                                            }
+                                        </View>
+                                    </View>
+                                ) : null;
+                            })()}
+
                             <View style={styles.row}>
                                 <Ionicons name="location-outline" size={14} color="#666" />
-                                <Text style={styles.detail} numberOfLines={2}>{item.shippingAddress}</Text>
+                                <Text style={styles.detail} numberOfLines={2}>Deliver to: {item.shippingAddress}</Text>
                             </View>
 
                             <View style={styles.itemsList}>
@@ -159,6 +179,13 @@ const styles = StyleSheet.create({
     badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
     row: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 4 },
     detail: { fontSize: 14, color: '#555', flex: 1 },
+    cookRow: {
+        flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6,
+        backgroundColor: '#fff5f0', borderRadius: 8, padding: 8,
+    },
+    cookLabel: { fontSize: 13, fontWeight: '600', color: '#ff6b35' },
+    cookAddress: { fontSize: 12, color: '#888', marginTop: 2 },
+    cookNoLocation: { fontSize: 12, color: '#FF9800', marginTop: 2 },
     itemsList: { marginTop: 8, marginBottom: 12 },
     itemText: { fontSize: 13, color: '#444', marginBottom: 2 },
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' },

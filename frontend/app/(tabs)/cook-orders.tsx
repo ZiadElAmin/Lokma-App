@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
     View, Text, StyleSheet, FlatList, ActivityIndicator,
-    RefreshControl, TouchableOpacity, Alert
+    RefreshControl, TouchableOpacity, Alert, Linking
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -157,6 +157,16 @@ const CookOrdersScreen = () => {
                         <Text style={styles.customerName}>
                             <Ionicons name="person-outline" size={13} color="#666" /> {item.user?.name}
                         </Text>
+                        {item.user?.phone && (
+                            <TouchableOpacity
+                                style={styles.phoneRow}
+                                onPress={() => Linking.openURL(`tel:${item.user.phone}`)}
+                            >
+                                <Ionicons name="call-outline" size={13} color="#4CAF50" />
+                                <Text style={styles.phoneText}>{item.user.phone}</Text>
+                                <Text style={styles.callLabel}>Tap to call</Text>
+                            </TouchableOpacity>
+                        )}
                         <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
                         <View style={styles.itemsList}>
                             {item.orderItems?.map((orderItem: any) => (
@@ -200,6 +210,14 @@ const CookOrdersScreen = () => {
                                         <Text style={styles.readyBtnText}>Ready</Text>
                                     </TouchableOpacity>
                                 </View>
+                            ) : item.isReadyForPickup && item.riderId && !item.isPickedUp ? (
+                                <TouchableOpacity
+                                    style={styles.trackBtn}
+                                    onPress={() => router.push(`/order/${item.id}`)}
+                                >
+                                    <Ionicons name="bicycle" size={16} color="#fff" />
+                                    <Text style={styles.readyBtnText}>Track Rider</Text>
+                                </TouchableOpacity>
                             ) : item.isReadyForPickup ? (
                                 <View style={styles.readyBadge}>
                                     <Ionicons name="bicycle-outline" size={16} color="#fff" />
@@ -272,6 +290,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, gap: 4,
     },
     acceptedText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+    phoneRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: '#f0faf0', borderRadius: 8, padding: 6, marginBottom: 4,
+    },
+    phoneText: { fontSize: 13, color: '#4CAF50', fontWeight: '600', flex: 1 },
+    callLabel: { fontSize: 11, color: '#4CAF50' },
+    trackBtn: {
+        backgroundColor: '#9C27B0', flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6,
+    },
     readyBtn: {
         backgroundColor: '#009688', flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6,

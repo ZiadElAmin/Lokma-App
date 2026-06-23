@@ -1,9 +1,10 @@
 import api from './client';
 
-const getMeals = async (search = '', cookId = '') => {
+const getMeals = async (search = '', cookId = '', category = '') => {
     const params = {};
     if (search) params.search = search;
     if (cookId) params.cookId = cookId;
+    if (category) params.category = category;
     const response = await api.get('/meals', { params });
     return response.data;
 };
@@ -46,6 +47,11 @@ const getMealReviews = async (mealId) => {
     return response.data;
 };
 
+const canReview = async (mealId) => {
+    const response = await api.get(`/meals/${mealId}/can-review`);
+    return response.data;
+};
+
 export default {
     getMeals,
     getMyMeals,
@@ -56,4 +62,5 @@ export default {
     getCooks,
     createReview,
     getMealReviews,
+    canReview,
 };

@@ -18,16 +18,26 @@ const MealDetailScreen = () => {
     const [myRating, setMyRating] = useState(0);
     const [myComment, setMyComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [canReview, setCanReview] = useState<boolean | null>(null);
+    const [reviewReason, setReviewReason] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMeal = async () => {
             try {
-                const [data, reviewData] = await Promise.all([
+                const promises: Promise<any>[] = [
                     mealsApi.getMealById(id),
                     mealsApi.getMealReviews(id),
-                ]);
+                ];
+                if (user?.role === 'Customer') {
+                    promises.push(mealsApi.canReview(id));
+                }
+                const [data, reviewData, reviewCheck] = await Promise.all(promises);
                 setMeal(data);
                 setReviews(reviewData);
+                if (reviewCheck) {
+                    setCanReview(reviewCheck.canReview);
+                    setReviewReason(reviewCheck.reason);
+                }
             } catch (err) {
                 console.error(err);
                 setError('Failed to load meal');
@@ -142,36 +152,52 @@ const MealDetailScreen = () => {
                         ))
                     )}
 
-                    {/* Submit Review — only for customers */}
+                    {/* Submit Review — only for customers who received this meal */}
                     {user?.role === 'Customer' && (
                         <View style={styles.reviewForm}>
                             <Text style={styles.sectionTitle}>Leave a Review</Text>
-                            <View style={styles.starsRow}>
-                                {[1,2,3,4,5].map(s => (
-                                    <TouchableOpacity key={s} onPress={() => setMyRating(s)}>
-                                        <Ionicons name="star" size={32} color={s <= myRating ? '#FFD700' : '#ddd'} />
+                            {canReview === true && (
+                                <>
+                                    <View style={styles.starsRow}>
+                                        {[1,2,3,4,5].map(s => (
+                                            <TouchableOpacity key={s} onPress={() => setMyRating(s)}>
+                                                <Ionicons name="star" size={32} color={s <= myRating ? '#FFD700' : '#ddd'} />
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                    <TextInput
+                                        style={styles.reviewInput}
+                                        placeholder="Write a comment (optional)"
+                                        value={myComment}
+                                        onChangeText={setMyComment}
+                                        multiline
+                                        numberOfLines={3}
+                                        placeholderTextColor="#aaa"
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+                                        onPress={handleSubmitReview}
+                                        disabled={submitting}
+                                    >
+                                        {submitting
+                                            ? <ActivityIndicator color="#fff" />
+                                            : <Text style={styles.submitBtnText}>Submit Review</Text>
+                                        }
                                     </TouchableOpacity>
-                                ))}
-                            </View>
-                            <TextInput
-                                style={styles.reviewInput}
-                                placeholder="Write a comment (optional)"
-                                value={myComment}
-                                onChangeText={setMyComment}
-                                multiline
-                                numberOfLines={3}
-                                placeholderTextColor="#aaa"
-                            />
-                            <TouchableOpacity
-                                style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
-                                onPress={handleSubmitReview}
-                                disabled={submitting}
-                            >
-                                {submitting
-                                    ? <ActivityIndicator color="#fff" />
-                                    : <Text style={styles.submitBtnText}>Submit Review</Text>
-                                }
-                            </TouchableOpacity>
+                                </>
+                            )}
+                            {canReview === false && reviewReason === 'already_reviewed' && (
+                                <View style={styles.reviewLocked}>
+                                    <Ionicons name="checkmark-circle" size={22} color="#4CAF50" />
+                                    <Text style={styles.reviewLockedText}>You already reviewed this meal.</Text>
+                                </View>
+                            )}
+                            {canReview === false && reviewReason === 'not_delivered' && (
+                                <View style={styles.reviewLocked}>
+                                    <Ionicons name="lock-closed-outline" size={22} color="#aaa" />
+                                    <Text style={styles.reviewLockedText}>Order and receive this meal to leave a review.</Text>
+                                </View>
+                            )}
                         </View>
                     )}
                 </View>
@@ -354,6 +380,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#ff6b35', borderRadius: 10, padding: 14, alignItems: 'center',
     },
     submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+    reviewLocked: {
+        flexDirection: 'row', alignItems: 'center', gap: 10,
+        backgroundColor: '#f8f9fa', borderRadius: 10, padding: 14, marginTop: 8,
+    },
+    reviewLockedText: { fontSize: 14, color: '#888', flex: 1 },
 });
 
 export default MealDetailScreen;

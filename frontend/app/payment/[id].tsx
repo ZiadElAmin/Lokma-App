@@ -1,23 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, TextInput,
+    View, Text, StyleSheet, TouchableOpacity,
     Alert, ActivityIndicator, ScrollView
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useStripe } from '@stripe/stripe-react-native';
 import ordersApi from '../../api/orders';
+import api from '../../api/client';
 
 export default function PaymentScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+    const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
     const [order, setOrder] = useState<any>(null);
     const [method, setMethod] = useState<'cash' | 'card'>('cash');
-    const [cardNumber, setCardNumber] = useState('');
-    const [expiry, setExpiry] = useState('');
-    const [cvv, setCvv] = useState('');
-    const [cardName, setCardName] = useState('');
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
 
@@ -34,43 +33,64 @@ export default function PaymentScreen() {
         load();
     }, [id]);
 
-    const formatCardNumber = (val: string) => {
-        const digits = val.replace(/\D/g, '').slice(0, 16);
-        return digits.replace(/(.{4})/g, '$1 ').trim();
-    };
-
-    const formatExpiry = (val: string) => {
-        const digits = val.replace(/\D/g, '').slice(0, 4);
-        if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
-        return digits;
-    };
-
     const handlePay = async () => {
-        if (method === 'card') {
-            const rawCard = cardNumber.replace(/\s/g, '');
-            if (rawCard.length < 16) return Alert.alert('Invalid Card', 'Enter a valid 16-digit card number');
-            if (expiry.length < 5)   return Alert.alert('Invalid Expiry', 'Enter expiry as MM/YY');
-            if (cvv.length < 3)      return Alert.alert('Invalid CVV', 'Enter a 3-digit CVV');
-            if (!cardName.trim())    return Alert.alert('Missing Name', 'Enter the name on the card');
-        }
-
         setLoading(true);
         try {
-            await ordersApi.updateOrderToPaid(id, {
-                id: `mock_${Date.now()}`,
-                status: 'COMPLETED',
-                update_time: new Date().toISOString(),
-                email_address: '',
-            });
-            Alert.alert(
-                '✅ Payment Successful',
-                method === 'cash'
-                    ? 'Your order is confirmed. Pay the rider on delivery.'
-                    : 'Payment confirmed. Your order is being prepared!',
-                [{ text: 'OK', onPress: () => router.replace('/my-orders') }]
-            );
-        } catch {
-            Alert.alert('Payment Failed', 'Something went wrong. Please try again.');
+            if (method === 'cash') {
+                await ordersApi.updateOrderToPaid(id, {
+                    id: `cash_${Date.now()}`,
+                    status: 'CASH_ON_DELIVERY',
+                    update_time: new Date().toISOString(),
+                    email_address: '',
+                });
+                Alert.alert(
+                    '✅ Order Confirmed',
+                    'Pay the rider in cash when your order arrives.',
+                    [{ text: 'OK', onPress: () => router.replace('/my-orders') }]
+                );
+            } else {
+                // 1. Get client secret from backend
+                const { data } = await api.post(`/orders/${id}/create-payment-intent`);
+                const clientSecret = data.clientSecret;
+
+                // 2. Init Stripe payment sheet
+                const { error: initError } = await initPaymentSheet({
+                    paymentIntentClientSecret: clientSecret,
+                    merchantDisplayName: 'Lokma',
+                    style: 'automatic',
+                });
+                if (initError) {
+                    Alert.alert('Error', initError.message);
+                    setLoading(false);
+                    return;
+                }
+
+                // 3. Present Stripe payment UI
+                const { error: payError } = await presentPaymentSheet();
+                if (payError) {
+                    if (payError.code !== 'Canceled') {
+                        Alert.alert('Payment Failed', payError.message);
+                    }
+                    setLoading(false);
+                    return;
+                }
+
+                // 4. Payment succeeded — mark order as paid in our DB
+                await ordersApi.updateOrderToPaid(id, {
+                    id: clientSecret.split('_secret')[0],
+                    status: 'COMPLETED',
+                    update_time: new Date().toISOString(),
+                    email_address: '',
+                });
+
+                Alert.alert(
+                    '✅ Payment Successful',
+                    'Your payment was confirmed. Your order is being prepared!',
+                    [{ text: 'OK', onPress: () => router.replace('/my-orders') }]
+                );
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err.response?.data?.message || 'Something went wrong. Please try again.');
         }
         setLoading(false);
     };
@@ -113,71 +133,27 @@ export default function PaymentScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Card Form */}
-                {method === 'card' && (
-                    <View style={s.cardForm}>
-                        <Text style={s.sectionTitle}>Card Details</Text>
-
-                        <Text style={s.fieldLabel}>Card Number</Text>
-                        <TextInput
-                            style={s.input}
-                            placeholder="1234 5678 9012 3456"
-                            value={cardNumber}
-                            onChangeText={(v) => setCardNumber(formatCardNumber(v))}
-                            keyboardType="numeric"
-                            maxLength={19}
-                            placeholderTextColor="#bbb"
-                        />
-
-                        <Text style={s.fieldLabel}>Name on Card</Text>
-                        <TextInput
-                            style={s.input}
-                            placeholder="John Doe"
-                            value={cardName}
-                            onChangeText={setCardName}
-                            autoCapitalize="words"
-                            placeholderTextColor="#bbb"
-                        />
-
-                        <View style={s.row}>
-                            <View style={s.halfField}>
-                                <Text style={s.fieldLabel}>Expiry</Text>
-                                <TextInput
-                                    style={s.input}
-                                    placeholder="MM/YY"
-                                    value={expiry}
-                                    onChangeText={(v) => setExpiry(formatExpiry(v))}
-                                    keyboardType="numeric"
-                                    maxLength={5}
-                                    placeholderTextColor="#bbb"
-                                />
-                            </View>
-                            <View style={s.halfField}>
-                                <Text style={s.fieldLabel}>CVV</Text>
-                                <TextInput
-                                    style={s.input}
-                                    placeholder="123"
-                                    value={cvv}
-                                    onChangeText={(v) => setCvv(v.replace(/\D/g, '').slice(0, 3))}
-                                    keyboardType="numeric"
-                                    maxLength={3}
-                                    secureTextEntry
-                                    placeholderTextColor="#bbb"
-                                />
-                            </View>
-                        </View>
+                {/* Info boxes */}
+                {method === 'cash' && (
+                    <View style={s.infoBox}>
+                        <Ionicons name="information-circle-outline" size={20} color="#666" />
+                        <Text style={s.infoText}>Pay the rider in cash when your order arrives.</Text>
                     </View>
                 )}
 
-                {method === 'cash' && (
-                    <View style={s.cashNote}>
-                        <Ionicons name="information-circle-outline" size={20} color="#666" />
-                        <Text style={s.cashNoteText}>Pay the rider in cash when your order arrives.</Text>
+                {method === 'card' && (
+                    <View style={s.infoBox}>
+                        <Ionicons name="shield-checkmark-outline" size={20} color="#4CAF50" />
+                        <Text style={s.infoText}>Secured by Stripe. You'll enter your card details on the next screen.</Text>
                     </View>
                 )}
 
                 {/* Pay Button */}
-                <TouchableOpacity style={[s.payBtn, loading && s.payBtnDisabled]} onPress={handlePay} disabled={loading}>
+                <TouchableOpacity
+                    style={[s.payBtn, loading && s.payBtnDisabled]}
+                    onPress={handlePay}
+                    disabled={loading}
+                >
                     {loading
                         ? <ActivityIndicator color="#fff" />
                         : <>
@@ -216,19 +192,11 @@ const s = StyleSheet.create({
     methodBtnActive: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
     methodText: { fontSize: 13, fontWeight: '600', color: '#555', textAlign: 'center' },
     methodTextActive: { color: '#fff' },
-    cardForm: { marginBottom: 24 },
-    fieldLabel: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6 },
-    input: {
-        backgroundColor: '#fff', borderRadius: 10, padding: 14,
-        fontSize: 16, borderWidth: 1, borderColor: '#eee', marginBottom: 16, color: '#333',
-    },
-    row: { flexDirection: 'row', gap: 12 },
-    halfField: { flex: 1 },
-    cashNote: {
+    infoBox: {
         flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 24,
     },
-    cashNoteText: { fontSize: 14, color: '#666', flex: 1 },
+    infoText: { fontSize: 14, color: '#666', flex: 1 },
     payBtn: {
         backgroundColor: '#4CAF50', borderRadius: 14, padding: 18,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,

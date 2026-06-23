@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 import { io } from 'socket.io-client';
 import ordersApi from '../../api/orders';
 import { useAuth } from '../../hooks/useAuth';
@@ -13,6 +13,7 @@ const SOCKET_URL = API_BASE_URL.replace('/api', '');
 const OrderDetailScreen = () => {
     const { id } = useLocalSearchParams();
     const router = useRouter();
+    const { user } = useAuth();
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<any>(null);
@@ -104,31 +105,95 @@ const OrderDetailScreen = () => {
                     <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
                 </View>
 
-                {/* Live Map — only visible when rider is on the way */}
-                {order.isPickedUp && !order.isDelivered && (
+                {/* Live Map
+                    Cook  → sees rider approaching UNTIL pickup
+                    Customer → sees rider on the way AFTER pickup            */}
+                {((user?.role === 'Cook' && order.riderId && !order.isPickedUp) ||
+                  (user?.role !== 'Cook' && order.isPickedUp && !order.isDelivered)) && (
                     <View style={styles.mapSection}>
-                        <Text style={styles.sectionTitle}>🛵 Rider Location</Text>
+                        <Text style={styles.sectionTitle}>
+                            {user?.role === 'Cook' ? '🛵 Rider is coming to pick up' : '🛵 Live Tracking'}
+                        </Text>
                         {riderLocation ? (
-                            <MapView
+                            <WebView
                                 style={styles.map}
-                                provider={PROVIDER_GOOGLE}
-                                region={{
-                                    latitude: riderLocation.latitude,
-                                    longitude: riderLocation.longitude,
-                                    latitudeDelta: 0.01,
-                                    longitudeDelta: 0.01,
-                                }}
-                            >
-                                <Marker
-                                    coordinate={riderLocation}
-                                    title="Your Rider"
-                                    description="On the way to you"
-                                >
-                                    <View style={styles.riderMarker}>
-                                        <Ionicons name="bicycle" size={20} color="#fff" />
-                                    </View>
-                                </Marker>
-                            </MapView>
+                                originWhitelist={['*']}
+                                source={{ html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>html,body,#map{height:100%;margin:0;padding:0;}</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var riderLat = ${riderLocation.latitude};
+  var riderLng = ${riderLocation.longitude};
+  var isCookView = ${user?.role === 'Cook' ? 'true' : 'false'};
+  var destLat = ${order.deliveryLat || riderLocation.latitude};
+  var destLng = ${order.deliveryLng || riderLocation.longitude};
+  var hasDestination = ${(order.deliveryLat && user?.role !== 'Cook') ? 'true' : 'false'};
+
+  var map = L.map('map').setView([riderLat, riderLng], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  // Rider marker
+  var riderIcon = L.divIcon({
+    html: '<div style="font-size:28px;line-height:1;">🛵</div>',
+    iconSize:[28,28], iconAnchor:[14,14], className:''
+  });
+  var riderMarker = L.marker([riderLat, riderLng], {icon: riderIcon}).addTo(map);
+  riderMarker.bindPopup('Your rider').openPopup();
+
+  // Customer destination marker
+  if (hasDestination) {
+    var destIcon = L.divIcon({
+      html: '<div style="font-size:28px;line-height:1;">📍</div>',
+      iconSize:[28,28], iconAnchor:[14,28], className:''
+    });
+    L.marker([destLat, destLng], {icon: destIcon}).addTo(map).bindPopup('Your location');
+
+    // Fit map to show both markers
+    var bounds = L.latLngBounds([[riderLat, riderLng],[destLat, destLng]]);
+    map.fitBounds(bounds, {padding:[40,40]});
+
+    // Draw route using OSRM (free, no API key)
+    fetch('https://router.project-osrm.org/route/v1/driving/'
+      + riderLng + ',' + riderLat + ';'
+      + destLng + ',' + destLat
+      + '?overview=full&geometries=geojson')
+    .then(r => r.json())
+    .then(data => {
+      if (data.routes && data.routes[0]) {
+        var route = data.routes[0];
+        L.geoJSON(route.geometry, {
+          style: { color: '#ff6b35', weight: 4, opacity: 0.8 }
+        }).addTo(map);
+
+        // ETA
+        var mins = Math.ceil(route.duration / 60);
+        var dist = (route.distance / 1000).toFixed(1);
+        var info = L.control({position: 'bottomleft'});
+        info.onAdd = function() {
+          var d = L.DomUtil.create('div');
+          d.style = 'background:white;padding:8px 12px;border-radius:10px;font-family:sans-serif;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,0.2)';
+          d.innerHTML = '⏱ ~' + mins + ' min &nbsp;|&nbsp; ' + dist + ' km';
+          return d;
+        };
+        info.addTo(map);
+      }
+    }).catch(function(){});
+  }
+</script>
+</body>
+</html>
+                                `}}
+                            />
                         ) : (
                             <View style={styles.mapPlaceholder}>
                                 <ActivityIndicator color="#ff6b35" />
@@ -328,7 +393,7 @@ const styles = StyleSheet.create({
     },
     paymentMethod: { marginLeft: 12, fontSize: 15, color: '#333' },
     mapSection: { backgroundColor: '#fff', marginTop: 12, padding: 16 },
-    map: { width: '100%', height: 220, borderRadius: 12, marginTop: 8 },
+    map: { width: '100%', height: 250, borderRadius: 12, marginTop: 8, overflow: 'hidden' },
     mapPlaceholder: {
         height: 120, justifyContent: 'center', alignItems: 'center',
         backgroundColor: '#f8f9fa', borderRadius: 12, marginTop: 8, gap: 8,

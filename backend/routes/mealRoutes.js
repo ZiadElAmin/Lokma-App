@@ -10,6 +10,7 @@ import {
     getCooks,
     createReview,
     getMealReviews,
+    canReviewMeal,
 } from '../controllers/mealController.js';
 import { protect, cook } from '../middleware/authMiddleware.js';
 
@@ -22,5 +23,6 @@ router
     .put(protect, cook, updateMeal)
     .delete(protect, cook, deleteMeal);
 router.route('/:id/reviews').post(protect, createReview).get(getMealReviews);
+router.route('/:id/can-review').get(protect, canReviewMeal);
 
 export default router;

@@ -23,7 +23,7 @@ export default function AIVerifyScreen() {
     const [showCamera, setShowCamera] = useState(false);
     const [countdown, setCountdown] = useState(null); // State for the timer display
 
-    // Cleanup timer if component unmounts to prevent memory leaks
+   
     useEffect(() => {
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);

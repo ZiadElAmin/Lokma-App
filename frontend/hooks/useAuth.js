@@ -93,12 +93,66 @@ export const AuthProvider = ({ children }) => {
         delete api.defaults.headers.common.Authorization;
     }, []);
 
+    const googleLogin = async (accessToken) => {
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await api.post('/users/google', { accessToken });
+            if (response.data.token) {
+                await setAuthToken(response.data.token);
+                setUser(response.data);
+                const pushToken = await registerForPushNotifications();
+                if (pushToken) {
+                    api.put('/users/push-token', { token: pushToken }).catch(() => {});
+                }
+            }
+            return response.data; // includes isNewUser flag
+        } catch (err) {
+            const message = err.response?.data?.message || 'Google sign-in failed';
+            setError(message);
+            throw new Error(message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteAccount = async () => {
+        try {
+            await api.delete('/users/delete');
+            await clearAuthToken();
+            setUser(null);
+            delete api.defaults.headers.common.Authorization;
+        } catch (err) {
+            const message = err.response?.data?.message || 'Failed to delete account';
+            throw new Error(message);
+        }
+    };
+
+    const setUserRole = async (role) => {
+        try {
+            const response = await api.put('/users/role', { role });
+            setUser(prev => ({ ...prev, role: response.data.role }));
+            return response.data;
+        } catch (err) {
+            const message = err.response?.data?.message || 'Failed to set role';
+            throw new Error(message);
+        }
+    };
+
+    const updateUser = (updatedFields) => {
+        setUser(prev => ({ ...prev, ...updatedFields }));
+    };
+
     const value = {
         user,
         loading,
         error,
         login,
+        googleLogin,
         logout,
+        updateUser,
+        setUserRole,
+        deleteAccount,
         isAuthenticated: !!user,
         isAdmin: user?.role === 'Admin',
         isCook: user?.role === 'Cook',

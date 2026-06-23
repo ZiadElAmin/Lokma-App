@@ -5,8 +5,51 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import mealsApi from '../../api/meals';
 import * as ImagePicker from 'expo-image-picker';
+import client from '../../api/client';
+
+const DEFAULT_LAT = 30.0444;
+const DEFAULT_LNG = 31.2357;
+
+const locationMapHTML = (lat: number, lng: number) => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .instruction {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.65); color: #fff; padding: 6px 14px;
+      border-radius: 20px; font-size: 13px; z-index: 999; white-space: nowrap;
+      font-family: sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="instruction">📍 Tap to set your kitchen location</div>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map').setView([${lat}, ${lng}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    var pinIcon = L.divIcon({ html: '<div style="font-size:32px;line-height:1;">📍</div>', iconSize:[32,32], iconAnchor:[16,32], className:'' });
+    var marker = L.marker([${lat}, ${lng}], { icon: pinIcon, draggable: true }).addTo(map);
+    function send(latlng) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ lat: latlng.lat, lng: latlng.lng }));
+    }
+    marker.on('dragend', function(e) { send(e.target.getLatLng()); });
+    map.on('click', function(e) { marker.setLatLng(e.latlng); send(e.latlng); });
+    send(marker.getLatLng());
+  </script>
+</body>
+</html>
+`;
+
+const MEAL_CATEGORIES = ['Egyptian', 'Grilled', 'Vegetarian', 'Seafood', 'Pasta', 'Sandwiches', 'Desserts', 'Soups', 'Other'];
 
 interface Meal {
     id: string;
@@ -14,6 +57,7 @@ interface Meal {
     description: string;
     price: number;
     image?: string;
+    category?: string;
 }
 
 interface Ingredient {
@@ -37,7 +81,9 @@ const CookDashboard = () => {
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [image, setImage] = useState('');
+    const [category, setCategory] = useState('Other');
     const [saving, setSaving] = useState(false);
+    const [earnings, setEarnings] = useState<{ totalEarnings: number; completedOrders: number } | null>(null);
     
     const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', grams: '', cost: '' }]);
     const [profitPercent, setProfitPercent] = useState('20');
@@ -45,9 +91,17 @@ const CookDashboard = () => {
     const [pricePer100g, setPricePer100g] = useState(0);
     const [totalGrams, setTotalGrams] = useState(0);
 
+    // Location
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const [locationPin, setLocationPin] = useState({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
+    const [locationPinSet, setLocationPinSet] = useState(false);
+    const [savingLocation, setSavingLocation] = useState(false);
+    const [cookAddress, setCookAddress] = useState('');
+
     useEffect(() => {
         if (user?.role === 'Cook' || user?.role === 'Admin') {
             fetchMyMeals();
+            client.get('/orders/cook-earnings').then(r => setEarnings(r.data)).catch(() => {});
         }
     }, [user]);
 
@@ -59,6 +113,34 @@ const CookDashboard = () => {
             console.error(err);
         }
         setLoading(false);
+    };
+
+    const handleLocationMessage = (event: any) => {
+        try {
+            const { lat, lng } = JSON.parse(event.nativeEvent.data);
+            setLocationPin({ lat, lng });
+            setLocationPinSet(true);
+        } catch {}
+    };
+
+    const handleSaveLocation = async () => {
+        if (!locationPinSet) {
+            Alert.alert('Set location', 'Tap the map to drop a pin at your kitchen location.');
+            return;
+        }
+        setSavingLocation(true);
+        try {
+            await client.put('/users/location', {
+                lat: locationPin.lat,
+                lng: locationPin.lng,
+                address: cookAddress.trim() || null,
+            });
+            Alert.alert('✅ Saved', 'Your kitchen location has been saved. Riders will now be able to navigate to you.');
+            setShowLocationModal(false);
+        } catch {
+            Alert.alert('Error', 'Failed to save location');
+        }
+        setSavingLocation(false);
     };
 
     const handleToggleAvailability = async () => {
@@ -117,6 +199,7 @@ const CookDashboard = () => {
         setDescription('');
         setPrice('');
         setImage('');
+        setCategory('Other');
         setEditingMeal(null);
     };
 
@@ -140,6 +223,7 @@ const CookDashboard = () => {
         setDescription(meal.description);
         setPrice(meal.price.toString());
         setImage(meal.image || '');
+        setCategory(meal.category || 'Other');
         setShowAddModal(true);
     };
 
@@ -151,7 +235,7 @@ const CookDashboard = () => {
 
         setSaving(true);
         try {
-            const mealData = { name, description, price: parseFloat(price), image };
+            const mealData = { name, description, price: parseFloat(price), image, category };
             
             if (editingMeal) {
                 await mealsApi.updateMeal(editingMeal.id, mealData);
@@ -228,10 +312,28 @@ const CookDashboard = () => {
                 </TouchableOpacity>
             </View>
 
+            {earnings && (
+                <View style={styles.earningsCard}>
+                    <View style={styles.earningsStat}>
+                        <Text style={styles.earningsValue}>EGP {earnings.totalEarnings.toFixed(2)}</Text>
+                        <Text style={styles.earningsLabel}>Total Earned</Text>
+                    </View>
+                    <View style={styles.earningsDivider} />
+                    <View style={styles.earningsStat}>
+                        <Text style={styles.earningsValue}>{earnings.completedOrders}</Text>
+                        <Text style={styles.earningsLabel}>Completed Orders</Text>
+                    </View>
+                </View>
+            )}
+
             <View style={styles.actionBar}>
                 <TouchableOpacity style={styles.actionBtn} onPress={() => setShowCalculator(true)}>
                     <Ionicons name="calculator" size={20} color="#fff" />
                     <Text style={styles.actionBtnText}>Calculator</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionBtn, styles.locationBtn]} onPress={() => setShowLocationModal(true)}>
+                    <Ionicons name="location" size={20} color="#fff" />
+                    <Text style={styles.actionBtnText}>My Location</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.actionBtn, styles.addBtn]} onPress={() => { resetForm(); setShowAddModal(true); }}>
                     <Ionicons name="add" size={20} color="#fff" />
@@ -320,6 +422,21 @@ const CookDashboard = () => {
                             </View>
                             
                             <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Category</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                                    {MEAL_CATEGORIES.map(cat => (
+                                        <TouchableOpacity
+                                            key={cat}
+                                            style={[styles.catChip, category === cat && styles.catChipActive]}
+                                            onPress={() => setCategory(cat)}
+                                        >
+                                            <Text style={[styles.catChipText, category === cat && styles.catChipTextActive]}>{cat}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+
+                            <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Meal Image</Text>
                                 {image ? (
                                     <View style={styles.imagePreviewContainer}>
@@ -348,6 +465,55 @@ const CookDashboard = () => {
                                 )}
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Location Modal */}
+            <Modal visible={showLocationModal} animationType="slide" transparent>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>📍 My Kitchen Location</Text>
+                            <TouchableOpacity onPress={() => setShowLocationModal(false)}>
+                                <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={{ fontSize: 13, color: '#888', marginBottom: 10 }}>
+                            Drop a pin at your kitchen so riders can navigate to pick up orders.
+                        </Text>
+                        <View style={{ height: 260, borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
+                            <WebView
+                                originWhitelist={['*']}
+                                source={{ html: locationMapHTML(DEFAULT_LAT, DEFAULT_LNG) }}
+                                onMessage={handleLocationMessage}
+                                javaScriptEnabled
+                                scrollEnabled={false}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                        {locationPinSet && (
+                            <Text style={{ fontSize: 12, color: '#4CAF50', marginBottom: 8 }}>
+                                ✅ Pin set at {locationPin.lat.toFixed(4)}, {locationPin.lng.toFixed(4)}
+                            </Text>
+                        )}
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Address label (e.g. Building 5, Maadi) — optional"
+                            value={cookAddress}
+                            onChangeText={setCookAddress}
+                            placeholderTextColor="#aaa"
+                        />
+                        <TouchableOpacity
+                            style={[styles.submitBtn, (!locationPinSet || savingLocation) && styles.submitBtnDisabled, { marginTop: 14 }]}
+                            onPress={handleSaveLocation}
+                            disabled={!locationPinSet || savingLocation}
+                        >
+                            {savingLocation
+                                ? <ActivityIndicator color="#fff" />
+                                : <Text style={styles.submitBtnText}>Save Location</Text>
+                            }
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -486,6 +652,23 @@ const styles = StyleSheet.create({
         color: '#888',
         marginTop: 4,
     },
+    earningsCard: {
+        flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 16,
+        marginTop: 12, borderRadius: 14, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07, shadowRadius: 6, elevation: 3,
+    },
+    earningsStat: { flex: 1, alignItems: 'center' },
+    earningsValue: { fontSize: 20, fontWeight: '800', color: '#ff6b35' },
+    earningsLabel: { fontSize: 12, color: '#888', marginTop: 2 },
+    earningsDivider: { width: 1, backgroundColor: '#eee', marginVertical: 4 },
+    catChip: {
+        paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+        backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: '#ddd',
+    },
+    catChipActive: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
+    catChipText: { fontSize: 13, fontWeight: '600', color: '#555' },
+    catChipTextActive: { color: '#fff' },
     actionBar: {
         flexDirection: 'row',
         padding: 16,
@@ -503,6 +686,9 @@ const styles = StyleSheet.create({
     },
     addBtn: {
         backgroundColor: '#ff6b35',
+    },
+    locationBtn: {
+        backgroundColor: '#2196F3',
     },
     actionBtnText: {
         color: '#fff',

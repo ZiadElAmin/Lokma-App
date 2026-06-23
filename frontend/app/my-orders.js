@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ordersApi from '../api/orders';
+import api from '../api/client';
 import withAuth from '../components/withAuth';
 
 const MyOrdersScreen = () => {
@@ -36,7 +37,30 @@ const MyOrdersScreen = () => {
         fetchOrders();
     };
 
+    const handleCancel = (orderId) => {
+        Alert.alert(
+            'Cancel Order',
+            'Are you sure you want to cancel this order?',
+            [
+                { text: 'Keep Order', style: 'cancel' },
+                {
+                    text: 'Cancel Order',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await api.put(`/orders/${orderId}/cancel`);
+                            fetchOrders();
+                        } catch (err) {
+                            Alert.alert('Cannot Cancel', err.response?.data?.message || 'Failed to cancel order');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const getStatusColor = (order) => {
+        if (order.isCancelled) return '#9E9E9E';
         if (order.isRejected) return '#f44336';
         if (order.isDelivered) return '#4CAF50';
         if (order.isAccepted) return '#2196F3';
@@ -45,12 +69,15 @@ const MyOrdersScreen = () => {
     };
 
     const getStatusText = (order) => {
+        if (order.isCancelled) return 'Cancelled';
         if (order.isRejected) return 'Rejected';
         if (order.isDelivered) return 'Delivered';
         if (order.isAccepted) return 'Preparing';
         if (order.isPaid) return 'Paid';
         return 'Pending';
     };
+
+    const canCancel = (order) => !order.isAccepted && !order.isRejected && !order.isDelivered && !order.isCancelled;
 
     const formatDate = (dateStr) => {
         const date = new Date(dateStr);
@@ -99,14 +126,24 @@ const MyOrdersScreen = () => {
                         </View>
                         <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
                         {item.isRejected && (
-                            <Text style={styles.rejectedNote}>
-                                ❌ This order was rejected by the cook.
-                            </Text>
+                            <Text style={styles.rejectedNote}>❌ This order was rejected by the cook.</Text>
+                        )}
+                        {item.isCancelled && (
+                            <Text style={styles.rejectedNote}>🚫 You cancelled this order.</Text>
                         )}
                         <View style={styles.orderFooter}>
                             <Text style={styles.orderTotal}>EGP {item.totalPrice.toFixed(2)}</Text>
                             <Text style={styles.orderItems}>{item.orderItems?.length || 0} items</Text>
-                            <Ionicons name="chevron-forward" size={20} color="#999" />
+                            {canCancel(item) ? (
+                                <TouchableOpacity
+                                    style={styles.cancelBtn}
+                                    onPress={(e) => { e.stopPropagation?.(); handleCancel(item.id); }}
+                                >
+                                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <Ionicons name="chevron-forward" size={20} color="#999" />
+                            )}
                         </View>
                     </TouchableOpacity>
                 )}
@@ -146,6 +183,11 @@ const styles = StyleSheet.create({
     },
     orderTotal: { fontSize: 18, fontWeight: 'bold', color: '#ff6b35' },
     orderItems: { fontSize: 14, color: '#666' },
+    cancelBtn: {
+        backgroundColor: '#fff0f0', borderWidth: 1, borderColor: '#f44336',
+        paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8,
+    },
+    cancelBtnText: { color: '#f44336', fontWeight: '600', fontSize: 13 },
 });
 
 export default withAuth(MyOrdersScreen);
