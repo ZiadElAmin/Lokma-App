@@ -1,53 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, TextInput, Modal, ScrollView, Image as RNImage } from 'react-native';
 import { Image } from 'react-native-elements';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../hooks/useAuth';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import LocationPicker from '../../components/LocationPicker';
 import mealsApi from '../../api/meals';
 import * as ImagePicker from 'expo-image-picker';
 import client from '../../api/client';
 
 const DEFAULT_LAT = 30.0444;
 const DEFAULT_LNG = 31.2357;
-
-const locationMapHTML = (lat: number, lng: number) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .instruction {
-      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.65); color: #fff; padding: 6px 14px;
-      border-radius: 20px; font-size: 13px; z-index: 999; white-space: nowrap;
-      font-family: sans-serif;
-    }
-  </style>
-</head>
-<body>
-  <div class="instruction">📍 Tap to set your kitchen location</div>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map').setView([${lat}, ${lng}], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-    var pinIcon = L.divIcon({ html: '<div style="font-size:32px;line-height:1;">📍</div>', iconSize:[32,32], iconAnchor:[16,32], className:'' });
-    var marker = L.marker([${lat}, ${lng}], { icon: pinIcon, draggable: true }).addTo(map);
-    function send(latlng) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ lat: latlng.lat, lng: latlng.lng }));
-    }
-    marker.on('dragend', function(e) { send(e.target.getLatLng()); });
-    map.on('click', function(e) { marker.setLatLng(e.latlng); send(e.latlng); });
-    send(marker.getLatLng());
-  </script>
-</body>
-</html>
-`;
 
 const MEAL_CATEGORIES = ['Egyptian', 'Grilled', 'Vegetarian', 'Seafood', 'Pasta', 'Sandwiches', 'Desserts', 'Soups', 'Other'];
 
@@ -58,6 +22,7 @@ interface Meal {
     price: number;
     image?: string;
     category?: string;
+    estimatedTime?: number | null;
 }
 
 interface Ingredient {
@@ -76,15 +41,16 @@ const CookDashboard = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
-    
+
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [price, setPrice] = useState('');
     const [image, setImage] = useState('');
     const [category, setCategory] = useState('Other');
+    const [estimatedTime, setEstimatedTime] = useState('');
     const [saving, setSaving] = useState(false);
     const [earnings, setEarnings] = useState<{ totalEarnings: number; completedOrders: number } | null>(null);
-    
+
     const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', grams: '', cost: '' }]);
     const [profitPercent, setProfitPercent] = useState('20');
     const [calculatedPrice, setCalculatedPrice] = useState(0);
@@ -102,8 +68,19 @@ const CookDashboard = () => {
         if (user?.role === 'Cook' || user?.role === 'Admin') {
             fetchMyMeals();
             client.get('/orders/cook-earnings').then(r => setEarnings(r.data)).catch(() => {});
+            client.get('/users/profile').then(r => setIsAvailable(!!r.data.isAvailable)).catch(() => {});
         }
     }, [user]);
+
+    useEffect(() => {
+        if (user?.isDisabled) {
+            Alert.alert(
+                '🚫 Account Disabled',
+                'Your account is disabled due to repeated hygiene violations. Your meals are hidden and you cannot accept orders or go online.\n\nPlease contact support at 01090374889 to have your account reviewed and re-enabled.',
+                [{ text: 'OK' }]
+            );
+        }
+    }, [user?.isDisabled]);
 
     const fetchMyMeals = async () => {
         try {
@@ -113,14 +90,6 @@ const CookDashboard = () => {
             console.error(err);
         }
         setLoading(false);
-    };
-
-    const handleLocationMessage = (event: any) => {
-        try {
-            const { lat, lng } = JSON.parse(event.nativeEvent.data);
-            setLocationPin({ lat, lng });
-            setLocationPinSet(true);
-        } catch {}
     };
 
     const handleSaveLocation = async () => {
@@ -148,8 +117,8 @@ const CookDashboard = () => {
         try {
             const res = await import('../../api/client').then(m => m.default.put('/users/availability'));
             setIsAvailable(res.data.isAvailable);
-        } catch {
-            Alert.alert('Error', 'Could not update availability');
+        } catch (err: any) {
+            Alert.alert('Cannot Go Online', err?.response?.data?.message || 'Could not update availability');
         }
         setTogglingAvailability(false);
     };
@@ -163,10 +132,10 @@ const CookDashboard = () => {
         }, 0);
         const profit = totalCost * (parseFloat(profitPercent) / 100);
         const finalPrice = totalCost + profit;
-        
+
         setCalculatedPrice(finalPrice);
         setTotalGrams(totalWeight);
-        
+
         if (totalWeight > 0) {
             const per100g = (finalPrice / totalWeight) * 100;
             setPricePer100g(per100g);
@@ -200,6 +169,7 @@ const CookDashboard = () => {
         setPrice('');
         setImage('');
         setCategory('Other');
+        setEstimatedTime('');
         setEditingMeal(null);
     };
 
@@ -224,6 +194,7 @@ const CookDashboard = () => {
         setPrice(meal.price.toString());
         setImage(meal.image || '');
         setCategory(meal.category || 'Other');
+        setEstimatedTime(meal.estimatedTime ? meal.estimatedTime.toString() : '');
         setShowAddModal(true);
     };
 
@@ -235,8 +206,8 @@ const CookDashboard = () => {
 
         setSaving(true);
         try {
-            const mealData = { name, description, price: parseFloat(price), image, category };
-            
+            const mealData = { name, description, price: parseFloat(price), image, category, estimatedTime: estimatedTime ? parseInt(estimatedTime, 10) : null };
+
             if (editingMeal) {
                 await mealsApi.updateMeal(editingMeal.id, mealData);
                 Alert.alert('Success', 'Meal updated successfully');
@@ -244,7 +215,7 @@ const CookDashboard = () => {
                 await mealsApi.createMeal(mealData);
                 Alert.alert('Success', 'Meal added successfully');
             }
-            
+
             setShowAddModal(false);
             resetForm();
             fetchMyMeals();
@@ -381,7 +352,7 @@ const CookDashboard = () => {
                                 <Ionicons name="close" size={24} color="#666" />
                             </TouchableOpacity>
                         </View>
-                        
+
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Name *</Text>
@@ -392,7 +363,7 @@ const CookDashboard = () => {
                                     placeholder="e.g., Koshari"
                                 />
                             </View>
-                            
+
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Description</Text>
                                 <TextInput
@@ -404,7 +375,7 @@ const CookDashboard = () => {
                                     numberOfLines={3}
                                 />
                             </View>
-                            
+
                             <View style={styles.priceRow}>
                                 <View style={[styles.inputGroup, {flex: 1}]}>
                                     <Text style={styles.inputLabel}>Price *</Text>
@@ -420,7 +391,7 @@ const CookDashboard = () => {
                                     <Ionicons name="calculator" size={20} color="#ff6b35" />
                                 </TouchableOpacity>
                             </View>
-                            
+
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Category</Text>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
@@ -437,10 +408,21 @@ const CookDashboard = () => {
                             </View>
 
                             <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Estimated cook time (minutes)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={estimatedTime}
+                                    onChangeText={setEstimatedTime}
+                                    placeholder="e.g. 30"
+                                    keyboardType="number-pad"
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Meal Image</Text>
                                 {image ? (
                                     <View style={styles.imagePreviewContainer}>
-                                        <Image source={{ uri: image }} style={styles.imagePreview} />
+                                        <RNImage source={{ uri: image }} style={styles.imagePreview} />
                                         <TouchableOpacity style={styles.changeImageBtn} onPress={pickImage}>
                                             <Text style={styles.changeImageBtnText}>Change Image</Text>
                                         </TouchableOpacity>
@@ -452,7 +434,7 @@ const CookDashboard = () => {
                                     </TouchableOpacity>
                                 )}
                             </View>
-                            
+
                             <TouchableOpacity
                                 style={[styles.submitBtn, saving && styles.submitBtnDisabled]}
                                 onPress={handleSubmit}
@@ -482,16 +464,13 @@ const CookDashboard = () => {
                         <Text style={{ fontSize: 13, color: '#888', marginBottom: 10 }}>
                             Drop a pin at your kitchen so riders can navigate to pick up orders.
                         </Text>
-                        <View style={{ height: 260, borderRadius: 12, overflow: 'hidden', marginBottom: 12 }}>
-                            <WebView
-                                originWhitelist={['*']}
-                                source={{ html: locationMapHTML(DEFAULT_LAT, DEFAULT_LNG) }}
-                                onMessage={handleLocationMessage}
-                                javaScriptEnabled
-                                scrollEnabled={false}
-                                style={{ flex: 1 }}
+                        {showLocationModal && (
+                            <LocationPicker
+                                height={240}
+                                autoLocate
+                                onChange={(c) => { setLocationPin(c); setLocationPinSet(true); }}
                             />
-                        </View>
+                        )}
                         {locationPinSet && (
                             <Text style={{ fontSize: 12, color: '#4CAF50', marginBottom: 8 }}>
                                 ✅ Pin set at {locationPin.lat.toFixed(4)}, {locationPin.lng.toFixed(4)}
@@ -528,7 +507,7 @@ const CookDashboard = () => {
                                 <Ionicons name="close" size={24} color="#666" />
                             </TouchableOpacity>
                         </View>
-                        
+
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <View style={styles.inputGroup}>
                                 <Text style={styles.sectionTitle}>Ingredients</Text>
@@ -564,7 +543,7 @@ const CookDashboard = () => {
                                     <Text style={styles.addIngredientText}>Add Ingredient</Text>
                                 </TouchableOpacity>
                             </View>
-                            
+
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Profit Margin (%)</Text>
                                 <TextInput
@@ -575,11 +554,11 @@ const CookDashboard = () => {
                                     keyboardType="decimal-pad"
                                 />
                             </View>
-                            
+
                             <TouchableOpacity style={styles.calculateBtn} onPress={calculatePrice}>
                                 <Text style={styles.calculateBtnText}>Calculate Price</Text>
                             </TouchableOpacity>
-                            
+
                             {calculatedPrice > 0 && (
                                 <View style={styles.resultCard}>
                                     <Text style={styles.resultLabel}>Suggested Price</Text>

@@ -9,6 +9,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import addressRoutes from './routes/addressRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
+import { startComplianceScheduler } from './utils/complianceScheduler.js';
 
 console.log('Starting server setup...');
 
@@ -24,13 +25,21 @@ try {
         cors: { origin: '*', methods: ['GET', 'POST'] }
     });
 
-    // Socket.io — rider location tracking
+    app.set('io', io);
+
     io.on('connection', (socket) => {
-        // Rider joins an order room to broadcast location
+        socket.on('join_user', (userId) => {
+            socket.join(`user_${userId}`);
+        });
+        socket.on('join_riders', () => {
+            socket.join('riders');
+        });
+        socket.on('leave_riders', () => {
+            socket.leave('riders');
+        });
         socket.on('join_order', (orderId) => {
             socket.join(`order_${orderId}`);
         });
-        // Rider emits their GPS coords
         socket.on('rider_location', ({ orderId, latitude, longitude }) => {
             io.to(`order_${orderId}`).emit('location_update', { latitude, longitude });
         });
@@ -73,6 +82,7 @@ try {
     console.log('Starting server...');
     const server = httpServer.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running on port ${PORT}`);
+        startComplianceScheduler(io);
     });
 
     server.on('error', (error) => {
@@ -95,8 +105,6 @@ try {
             process.exit(0);
         });
     }
-
-    // export default app;
 
 } catch (error) {
     console.error('Error during server setup:', error);

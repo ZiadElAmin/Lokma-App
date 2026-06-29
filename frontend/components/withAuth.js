@@ -9,7 +9,6 @@ const withAuth = (WrappedComponent) => {
 
         useEffect(() => {
             if (!loading && !user) {
-                // Navigation handled by Redirect component
             }
         }, [loading, user]);
 

@@ -49,7 +49,7 @@ export default function RiderAvailableScreen() {
                             } else {
                                 Alert.alert('Error', 'Could not claim order. Please try again.');
                             }
-                            fetchOrders(); // refresh so claimed order disappears
+                            fetchOrders();
                         }
                     },
                 },

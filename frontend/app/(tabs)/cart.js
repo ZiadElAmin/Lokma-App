@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput } from 'react-native';
 import { useCart } from '../../hooks/useCart';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import withAuth from '../../components/withAuth';
 
 const CartScreen = () => {
-    const { cartItems, removeFromCart, updateQty, getCartTotal } = useCart();
+    const { cartItems, removeFromCart, updateCartItemQuantity: updateQty, updateCartItemNote, getCartTotal } = useCart();
     const router = useRouter();
 
     if (cartItems.length === 0) {
@@ -73,6 +73,13 @@ const CartScreen = () => {
                                 </View>
                                 <Text style={styles.itemTotal}>EGP {(item.price * item.qty).toFixed(2)}</Text>
                             </View>
+                            <TextInput
+                                style={styles.noteInput}
+                                placeholder="Add a note (optional), e.g. no onions"
+                                value={item.note || ''}
+                                onChangeText={(t) => updateCartItemNote(item.id, t)}
+                                placeholderTextColor="#bbb"
+                            />
                         </View>
                     </View>
                 )}
@@ -80,16 +87,6 @@ const CartScreen = () => {
             />
             
             <View style={styles.footer}>
-                <View style={styles.couponRow}>
-                    <View style={styles.couponInput}>
-                        <Ionicons name="pricetag-outline" size={20} color="#888" />
-                        <Text style={styles.couponText}>Add coupon code</Text>
-                    </View>
-                    <TouchableOpacity style={styles.applyBtn}>
-                        <Text style={styles.applyBtnText}>Apply</Text>
-                    </TouchableOpacity>
-                </View>
-                
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Subtotal</Text>
                     <Text style={styles.summaryValue}>EGP {subtotal.toFixed(2)}</Text>
@@ -260,6 +257,15 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#ff6b35',
+    },
+    noteInput: {
+        marginTop: 10,
+        backgroundColor: '#f8f8f8',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 13,
+        color: '#333',
     },
     footer: {
         backgroundColor: '#fff',

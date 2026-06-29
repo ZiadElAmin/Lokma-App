@@ -9,10 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ordersApi from '../../api/orders';
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../hooks/useSocket';
 
 const CookOrdersScreen = () => {
     const router = useRouter();
     const { user } = useAuth();
+    const { subscribe } = useSocket();
     const [orders, setOrders] = useState<any>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -36,6 +38,20 @@ const CookOrdersScreen = () => {
             fetchOrders();
         }, [])
     );
+
+    useEffect(() => {
+        if (!subscribe) return;
+        const unsubscribe = subscribe(({ orderId, status }) => {
+            if (status === 'cancelled') {
+                setOrders(prev => prev.filter(o => o.id !== orderId));
+            } else if (status === 'compliance_due') {
+                setOrders(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, complianceReminderSent: true } : o
+                ));
+            }
+        });
+        return unsubscribe;
+    }, [subscribe]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -170,9 +186,16 @@ const CookOrdersScreen = () => {
                         <Text style={styles.orderDate}>{formatDate(item.createdAt)}</Text>
                         <View style={styles.itemsList}>
                             {item.orderItems?.map((orderItem: any) => (
-                                <Text key={orderItem.id} style={styles.itemText}>
-                                    • {orderItem.qty}x {orderItem.name} — EGP {orderItem.price.toFixed(2)}
-                                </Text>
+                                <View key={orderItem.id}>
+                                    <Text style={styles.itemText}>
+                                        • {orderItem.qty}x {orderItem.name} — EGP {orderItem.price.toFixed(2)}
+                                    </Text>
+                                    {orderItem.note ? (
+                                        <Text style={{ fontSize: 12, color: '#ff6b35', fontStyle: 'italic', marginLeft: 12, marginBottom: 2 }}>
+                                            📝 {orderItem.note}
+                                        </Text>
+                                    ) : null}
+                                </View>
                             ))}
                         </View>
                         <View style={styles.orderFooter}>
@@ -196,12 +219,16 @@ const CookOrdersScreen = () => {
                                 </View>
                             ) : item.isAccepted && !item.isReadyForPickup ? (
                                 <View style={styles.actionButtons}>
-                                    <View style={styles.acceptedBadge}>
-                                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                                        <Text style={styles.acceptedText}>
-                                            Accepted {item.aiVerified ? '· AI ✓' : ''}
-                                        </Text>
-                                    </View>
+                                    {}
+                                    {item.complianceReminderSent && (
+                                        <TouchableOpacity
+                                            style={styles.complianceBtn}
+                                            onPress={() => router.push(`/ai-verify?orderId=${item.id}&mode=compliance`)}
+                                        >
+                                            <Ionicons name="camera-reverse-outline" size={16} color="#fff" />
+                                            <Text style={styles.readyBtnText}>Re-verify</Text>
+                                        </TouchableOpacity>
+                                    )}
                                     <TouchableOpacity
                                         style={styles.readyBtn}
                                         onPress={() => handleMarkReady(item.id)}
@@ -302,6 +329,10 @@ const styles = StyleSheet.create({
     },
     readyBtn: {
         backgroundColor: '#009688', flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6,
+    },
+    complianceBtn: {
+        backgroundColor: '#ff6b35', flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, gap: 6,
     },
     readyBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },

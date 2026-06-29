@@ -17,6 +17,7 @@ export default function EditProfileScreen() {
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
     const [phone, setPhone] = useState(user?.phone || '');
+    const [bio, setBio] = useState(user?.bio || '');
     const [saving, setSaving] = useState(false);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [localAvatar, setLocalAvatar] = useState<string | null>(user?.avatar || null);
@@ -63,6 +64,7 @@ export default function EditProfileScreen() {
                 name: name.trim(),
                 email: email.trim(),
                 phone: phone.trim() || null,
+                bio: bio.trim() || null,
             });
             updateUser(res.data);
             Alert.alert('✅ Saved', 'Your profile has been updated.', [
@@ -156,6 +158,25 @@ export default function EditProfileScreen() {
                                     />
                                 </View>
                             </View>
+
+                            {user?.role === 'Cook' && (
+                                <>
+                                    <View style={styles.divider} />
+                                    <View style={styles.field}>
+                                        <Text style={styles.label}>Bio</Text>
+                                        <TextInput
+                                            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+                                            value={bio}
+                                            onChangeText={setBio}
+                                            placeholder="Tell customers about yourself and your cooking..."
+                                            placeholderTextColor="#bbb"
+                                            multiline
+                                            maxLength={200}
+                                        />
+                                        <Text style={{ fontSize: 11, color: '#bbb', marginTop: 4, textAlign: 'right' }}>{bio.length}/200</Text>
+                                    </View>
+                                </>
+                            )}
                         </View>
 
                         <TouchableOpacity

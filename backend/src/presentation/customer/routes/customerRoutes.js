@@ -1,13 +1,3 @@
-/**
- * Customer Presentation Layer - Routes
- * 
- * Customer features:
- * - Browse meals
- * - Create orders
- * - View order history
- * - Leave reviews
- * - Payment
- */
 
 import express from 'express';
 import { protect, authorize } from '../../../middleware/authMiddleware.js';
@@ -16,7 +6,6 @@ import asyncHandler from 'express-async-handler';
 
 const router = express.Router();
 
-// All routes require customer role
 router.use(protect);
 
 router.get('/meals', asyncHandler(async (req, res) => {
@@ -79,7 +68,6 @@ router.post('/orders/:id/review', asyncHandler(async (req, res) => {
         throw new Error('Can only review delivered orders');
     }
 
-    // Create review for first meal in order
     const review = await prisma.review.create({
         data: {
             userId: req.user.id,

@@ -93,6 +93,32 @@ const AdminPanel = () => {
         );
     };
 
+    const handleToggleDisable = (cook) => {
+        const disabling = !cook.isDisabled;
+        Alert.alert(
+            disabling ? 'Disable Cook' : 'Re-enable Cook',
+            disabling
+                ? `Disable "${cook.name}"? They won't be able to go online or accept orders.`
+                : `Re-enable "${cook.name}"? This also resets their violation count to 0.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: disabling ? 'Disable' : 'Enable',
+                    style: disabling ? 'destructive' : 'default',
+                    onPress: async () => {
+                        try {
+                            if (disabling) await adminApi.disableUser(cook.id);
+                            else await adminApi.enableUser(cook.id);
+                            fetchData();
+                        } catch (err) {
+                            Alert.alert('Error', 'Failed to update cook status');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleUpdateOrderStatus = (order, isPaid, isDelivered) => {
         Alert.alert(
             'Update Order Status',
@@ -249,11 +275,31 @@ const AdminPanel = () => {
                                 <View style={styles.itemInfo}>
                                     <Text style={styles.itemName}>{item.name}</Text>
                                     <Text style={styles.itemEmail}>{item.email}</Text>
+                                    <View style={styles.cookMetaRow}>
+                                        <View style={[styles.violationPill, { backgroundColor: (item.violationCount || 0) >= 5 ? '#ffebee' : (item.violationCount || 0) > 0 ? '#fff3e0' : '#e8f5e9' }]}>
+                                            <Ionicons name="warning-outline" size={12} color={(item.violationCount || 0) >= 5 ? '#f44336' : (item.violationCount || 0) > 0 ? '#ff9800' : '#4CAF50'} />
+                                            <Text style={styles.violationPillText}>{item.violationCount || 0} violations</Text>
+                                        </View>
+                                        {item.isDisabled && (
+                                            <View style={styles.disabledPill}>
+                                                <Text style={styles.disabledPillText}>DISABLED</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </View>
-                                <View style={styles.cookBadge}>
-                                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                                    <Text style={styles.cookBadgeText}>Cook</Text>
-                                </View>
+                                <TouchableOpacity
+                                    style={[styles.statusToggleBtn, { backgroundColor: item.isDisabled ? '#e8f5e9' : '#ffebee' }]}
+                                    onPress={() => handleToggleDisable(item)}
+                                >
+                                    <Ionicons
+                                        name={item.isDisabled ? 'lock-open-outline' : 'lock-closed-outline'}
+                                        size={16}
+                                        color={item.isDisabled ? '#4CAF50' : '#f44336'}
+                                    />
+                                    <Text style={[styles.statusToggleText, { color: item.isDisabled ? '#4CAF50' : '#f44336' }]}>
+                                        {item.isDisabled ? 'Enable' : 'Disable'}
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
                         )}
                     />
@@ -497,6 +543,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 4,
     },
+    cookMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+    violationPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+    violationPillText: { fontSize: 11, fontWeight: '600', color: '#555' },
+    disabledPill: { backgroundColor: '#f44336', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+    disabledPillText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+    statusToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+    statusToggleText: { fontSize: 12, fontWeight: '700' },
     cookBadgeText: {
         fontSize: 12,
         color: '#4CAF50',

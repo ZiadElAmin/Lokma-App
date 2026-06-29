@@ -16,7 +16,6 @@ import {
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(protect);
 
 // Order CRUD
@@ -32,7 +31,6 @@ router.put('/:id/pickup', authorize('Delivery', 'Admin'), pickupOrder);
 router.put('/:id/deliver', authorize('Delivery', 'Admin'), deliverOrder);
 router.put('/:id/cancel', cancelOrder);
 
-// Role-specific endpoints
 router.get('/cook/orders', authorize('Cook', 'Admin'), getCookOrders);
 router.get('/delivery/available', authorize('Delivery', 'Admin'), getAvailableOrders);
 

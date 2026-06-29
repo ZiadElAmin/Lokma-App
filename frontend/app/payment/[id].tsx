@@ -49,11 +49,9 @@ export default function PaymentScreen() {
                     [{ text: 'OK', onPress: () => router.replace('/my-orders') }]
                 );
             } else {
-                // 1. Get client secret from backend
                 const { data } = await api.post(`/orders/${id}/create-payment-intent`);
                 const clientSecret = data.clientSecret;
 
-                // 2. Init Stripe payment sheet
                 const { error: initError } = await initPaymentSheet({
                     paymentIntentClientSecret: clientSecret,
                     merchantDisplayName: 'Lokma',
@@ -65,7 +63,6 @@ export default function PaymentScreen() {
                     return;
                 }
 
-                // 3. Present Stripe payment UI
                 const { error: payError } = await presentPaymentSheet();
                 if (payError) {
                     if (payError.code !== 'Canceled') {
@@ -75,7 +72,7 @@ export default function PaymentScreen() {
                     return;
                 }
 
-                // 4. Payment succeeded — mark order as paid in our DB
+                // 4. Payment succeeded
                 await ordersApi.updateOrderToPaid(id, {
                     id: clientSecret.split('_secret')[0],
                     status: 'COMPLETED',

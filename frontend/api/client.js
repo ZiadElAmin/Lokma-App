@@ -72,4 +72,8 @@ export const clearAuthToken = async () => {
     await deleteSecureItemAsync('userToken');
 };
 
+export const getAuthToken = async () => {
+    return await getSecureItemAsync('userToken');
+};
+
 export default api;

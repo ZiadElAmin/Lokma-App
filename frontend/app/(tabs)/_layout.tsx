@@ -6,7 +6,6 @@ import { useCart } from '../../hooks/useCart';
 import { useAuth } from '../../hooks/useAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Which tabs each role sees, in display order
 const ROLE_TABS: Record<string, string[]> = {
   Customer: ['index', 'cart', 'profile'],
   Cook:     ['index', 'cook', 'cook-orders', 'cart', 'profile'],

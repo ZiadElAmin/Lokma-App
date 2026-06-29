@@ -29,6 +29,21 @@ const deleteUser = async (id) => {
     await api.delete(`/admin/users/${id}`);
 };
 
+const disableUser = async (id) => {
+    const response = await api.put(`/admin/users/${id}/disable`);
+    return response.data;
+};
+
+const enableUser = async (id) => {
+    const response = await api.put(`/admin/users/${id}/enable`);
+    return response.data;
+};
+
+const getViolations = async () => {
+    const response = await api.get('/admin/violations');
+    return response.data;
+};
+
 const deleteOrder = async (id) => {
     await api.delete(`/admin/orders/${id}`);
 };
@@ -45,6 +60,9 @@ export default {
     getAllRiders,
     getAllOrders,
     deleteUser,
+    disableUser,
+    enableUser,
+    getViolations,
     deleteOrder,
     updateOrderStatus,
 };

@@ -4,8 +4,8 @@ import {
     Alert, ActivityIndicator, ScrollView, TextInput
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import LocationPicker from '../components/LocationPicker';
 import { useCart } from '../hooks/useCart';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ordersApi from '../api/orders';
@@ -15,63 +15,6 @@ import withAuth from '../components/withAuth';
 // Default center: Cairo
 const DEFAULT_LAT = 30.0444;
 const DEFAULT_LNG = 31.2357;
-
-const mapHTML = (lat, lng) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .instruction {
-      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.65); color: #fff; padding: 6px 14px;
-      border-radius: 20px; font-size: 13px; z-index: 999; white-space: nowrap;
-      font-family: sans-serif;
-    }
-  </style>
-</head>
-<body>
-  <div class="instruction">📍 Tap to place your delivery pin</div>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map', { zoomControl: true }).setView([${lat}, ${lng}], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    var pinIcon = L.divIcon({
-      html: '<div style="font-size:32px;line-height:1;">📍</div>',
-      iconSize: [32, 32], iconAnchor: [16, 32], className: ''
-    });
-
-    var marker = L.marker([${lat}, ${lng}], { icon: pinIcon, draggable: true }).addTo(map);
-
-    function sendLocation(latlng) {
-      window.ReactNativeWebView.postMessage(JSON.stringify({
-        lat: latlng.lat, lng: latlng.lng
-      }));
-    }
-
-    // Drag marker
-    marker.on('dragend', function(e) {
-      sendLocation(e.target.getLatLng());
-    });
-
-    // Tap map to move marker
-    map.on('click', function(e) {
-      marker.setLatLng(e.latlng);
-      sendLocation(e.latlng);
-    });
-
-    // Send initial position
-    sendLocation(marker.getLatLng());
-  </script>
-</body>
-</html>
-`;
 
 const CheckoutScreen = () => {
     const [pin, setPin] = useState({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
@@ -86,30 +29,21 @@ const CheckoutScreen = () => {
     const [savedAddresses, setSavedAddresses] = useState([]);
     const [selectedAddressId, setSelectedAddressId] = useState(null);
     const [showNewPin, setShowNewPin] = useState(false);
+    const [saveForNextTime, setSaveForNextTime] = useState(true);
 
     const { cartItems, clearCart, getCartTotal } = useCart();
     const router = useRouter();
-    const webviewRef = useRef(null);
 
     useEffect(() => {
         addressesApi.getAddresses().then(data => {
             setSavedAddresses(data);
             if (data.length > 0) {
-                // Auto-select first saved address
                 setSelectedAddressId(data[0].id);
             } else {
                 setShowNewPin(true);
             }
         }).catch(() => setShowNewPin(true));
     }, []);
-
-    const handleMapMessage = (event) => {
-        try {
-            const { lat, lng } = JSON.parse(event.nativeEvent.data);
-            setPin({ lat, lng });
-            setPinSet(true);
-        } catch {}
-    };
 
     const handleCheckout = async () => {
         let deliveryLat, deliveryLng, fullAddress;
@@ -139,6 +73,18 @@ const CheckoutScreen = () => {
             if (apartment.trim()) parts.push(`Apt ${apartment.trim()}`);
             if (addressNote.trim()) parts.push(addressNote.trim());
             fullAddress = parts.join(', ');
+
+            if (saveForNextTime) {
+                addressesApi.createAddress({
+                    label: 'Home',
+                    lat: pin.lat,
+                    lng: pin.lng,
+                    building: building.trim(),
+                    floor: floor.trim() || null,
+                    apartment: apartment.trim() || null,
+                    notes: addressNote.trim() || null,
+                }).catch(() => {});
+            }
         }
 
         setLoading(true);
@@ -148,6 +94,7 @@ const CheckoutScreen = () => {
             image: item.image,
             price: item.price,
             meal: item.id,
+            note: item.note || null,
         }));
 
         const order = {
@@ -212,7 +159,7 @@ const CheckoutScreen = () => {
                                 );
                             })}
 
-                            {/* Use new pin option */}
+                            {}
                             <TouchableOpacity
                                 style={[styles.addrCard, (showNewPin && !selectedAddressId) && styles.addrCardSelected]}
                                 onPress={() => { setSelectedAddressId(null); setShowNewPin(true); }}
@@ -229,21 +176,14 @@ const CheckoutScreen = () => {
                         </>
                     )}
 
-                    {/* Map — shown if no saved addresses or user chose new pin */}
+                    {}
                     {(showNewPin || savedAddresses.length === 0) && !selectedAddressId && (
                         <>
-                            <Text style={styles.mapHint}>Tap anywhere on the map or drag the pin to your exact door</Text>
-                            <View style={styles.mapContainer}>
-                                <WebView
-                                    ref={webviewRef}
-                                    style={styles.map}
-                                    originWhitelist={['*']}
-                                    source={{ html: mapHTML(DEFAULT_LAT, DEFAULT_LNG) }}
-                                    onMessage={handleMapMessage}
-                                    scrollEnabled={false}
-                                    javaScriptEnabled
-                                />
-                            </View>
+                            <Text style={styles.mapHint}>Use your current location, or tap/drag the pin to your exact door</Text>
+                            <LocationPicker
+                                autoLocate
+                                onChange={(c) => { setPin(c); setPinSet(true); }}
+                            />
                             {pinSet && (
                                 <View style={styles.pinConfirmed}>
                                     <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
@@ -262,6 +202,16 @@ const CheckoutScreen = () => {
                             </View>
                             <TextInput style={styles.input} placeholder="Additional notes (landmarks, ring bell, etc.)"
                                 value={addressNote} onChangeText={setAddressNote} placeholderTextColor="#aaa" />
+
+                            {}
+                            <TouchableOpacity style={styles.saveToggle} onPress={() => setSaveForNextTime(v => !v)}>
+                                <Ionicons
+                                    name={saveForNextTime ? 'checkbox' : 'square-outline'}
+                                    size={22}
+                                    color={saveForNextTime ? '#ff6b35' : '#bbb'}
+                                />
+                                <Text style={styles.saveToggleText}>Save this address for next time</Text>
+                            </TouchableOpacity>
                         </>
                     )}
                 </View>
@@ -314,6 +264,18 @@ const styles = StyleSheet.create({
     mapHint: { fontSize: 13, color: '#888', marginBottom: 12 },
     mapContainer: { height: 280, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
     map: { flex: 1 },
+    locateBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        backgroundColor: '#ff6b35', paddingVertical: 11, borderRadius: 10, marginBottom: 10,
+    },
+    locateBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+    mapLocating: {
+        position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16,
+    },
+    mapLocatingText: { fontSize: 12, color: '#555', fontWeight: '600' },
+    saveToggle: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+    saveToggleText: { fontSize: 14, color: '#444', fontWeight: '600' },
     pinConfirmed: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, marginBottom: 6 },
     pinConfirmedText: { fontSize: 13, color: '#4CAF50', fontWeight: '600' },
     row: { flexDirection: 'row', gap: 10 },

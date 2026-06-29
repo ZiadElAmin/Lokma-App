@@ -20,6 +20,9 @@ import {
     cancelOrder,
     getCookEarnings,
     getRiderEarnings,
+    submitCompliance,
+    envCheck,
+    getOrderRecommendations,
 } from '../controllers/orderController.js';
 import { protect, cook, rider } from '../middleware/authMiddleware.js';
 
@@ -40,6 +43,9 @@ router.route('/:id/claim').put(protect, rider, claimOrder);
 router.route('/:id/pickup').put(protect, rider, pickupOrder);
 router.route('/:id/deliver').put(protect, rider, deliverOrder);
 router.route('/:id/cancel').put(protect, cancelOrder);
+router.route('/:id/compliance').post(protect, cook, submitCompliance);
+router.route('/:id/env-check').post(protect, cook, envCheck);
+router.route('/:id/recommendations').get(protect, getOrderRecommendations);
 router.route('/orders/:id').delete(deleteOrder);
 
 export default router;

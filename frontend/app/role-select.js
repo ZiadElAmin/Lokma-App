@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -34,6 +34,7 @@ const ROLES = [
 
 const RoleSelectScreen = () => {
     const [selected, setSelected] = useState(null);
+    const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
     const { setUserRole } = useAuth();
@@ -43,9 +44,13 @@ const RoleSelectScreen = () => {
             Alert.alert('Choose a role', 'Please select how you want to use Lokma.');
             return;
         }
+        if (phone.trim().length < 7) {
+            Alert.alert('Phone number', 'Please enter a valid phone number so we can reach you about orders.');
+            return;
+        }
         setLoading(true);
         try {
-            await setUserRole(selected);
+            await setUserRole(selected, phone.trim());
             router.replace('/(tabs)');
         } catch (error) {
             Alert.alert('Error', error.message);
@@ -90,10 +95,20 @@ const RoleSelectScreen = () => {
                     })}
                 </View>
 
+                <Text style={styles.phoneLabel}>Your phone number</Text>
+                <TextInput
+                    style={styles.phoneInput}
+                    placeholder="e.g. 01012345678"
+                    value={phone}
+                    onChangeText={setPhone}
+                    keyboardType="phone-pad"
+                    placeholderTextColor="#aaa"
+                />
+
                 <TouchableOpacity
-                    style={[styles.continueBtn, !selected && styles.continueBtnDisabled]}
+                    style={[styles.continueBtn, (!selected || phone.trim().length < 7) && styles.continueBtnDisabled]}
                     onPress={handleContinue}
-                    disabled={loading || !selected}
+                    disabled={loading || !selected || phone.trim().length < 7}
                 >
                     {loading ? (
                         <ActivityIndicator color="#fff" />
@@ -174,6 +189,11 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    phoneLabel: { fontSize: 14, fontWeight: '600', color: '#333', marginTop: 8, marginBottom: 8 },
+    phoneInput: {
+        backgroundColor: '#fafafa', borderRadius: 12, borderWidth: 1, borderColor: '#eee',
+        paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#333',
     },
     continueBtn: {
         backgroundColor: '#ff6b35',

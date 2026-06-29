@@ -20,6 +20,7 @@ const MealDetailScreen = () => {
     const [submitting, setSubmitting] = useState(false);
     const [canReview, setCanReview] = useState<boolean | null>(null);
     const [reviewReason, setReviewReason] = useState<string | null>(null);
+    const [reviewOrderId, setReviewOrderId] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchMeal = async () => {
@@ -37,6 +38,7 @@ const MealDetailScreen = () => {
                 if (reviewCheck) {
                     setCanReview(reviewCheck.canReview);
                     setReviewReason(reviewCheck.reason);
+                    setReviewOrderId(reviewCheck.orderId || null);
                 }
             } catch (err) {
                 console.error(err);
@@ -51,13 +53,17 @@ const MealDetailScreen = () => {
         if (myRating === 0) return Alert.alert('Select a rating', 'Tap the stars to rate this meal');
         setSubmitting(true);
         try {
-            await mealsApi.createReview(id, { rating: myRating, comment: myComment });
-            const [updatedMeal, updatedReviews] = await Promise.all([
+            await mealsApi.createReview(id, { rating: myRating, comment: myComment, orderId: reviewOrderId });
+            const [updatedMeal, updatedReviews, recheck] = await Promise.all([
                 mealsApi.getMealById(id),
                 mealsApi.getMealReviews(id),
+                mealsApi.canReview(id),
             ]);
             setMeal(updatedMeal);
             setReviews(updatedReviews);
+            setCanReview(recheck.canReview);
+            setReviewReason(recheck.reason);
+            setReviewOrderId(recheck.orderId || null);
             setMyRating(0);
             setMyComment('');
             Alert.alert('Thanks!', 'Your review has been submitted.');
@@ -101,8 +107,8 @@ const MealDetailScreen = () => {
         <>
             <Stack.Screen options={{ headerShown: false }} />
             <ScrollView style={styles.container}>
-                <Image 
-                    source={{ uri: meal.image || 'https://via.placeholder.com/400x300' }} 
+                <Image
+                    source={{ uri: meal.image || 'https://via.placeholder.com/400x300' }}
                     style={styles.image}
                 />
                 <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -125,10 +131,17 @@ const MealDetailScreen = () => {
                     <Text style={styles.description}>{meal.description}</Text>
 
                     <View style={styles.cookInfo}>
-                        <Ionicons name="person-circle" size={40} color="#ff6b35" />
+                        {meal.cook?.avatar ? (
+                            <Image source={{ uri: meal.cook.avatar }} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                        ) : (
+                            <Ionicons name="person-circle" size={40} color="#ff6b35" />
+                        )}
                         <View style={styles.cookDetails}>
                             <Text style={styles.cookLabel}>Prepared by</Text>
                             <Text style={styles.cookName}>{meal.cook?.name || 'Home Cook'}</Text>
+                            {meal.cook?.bio ? (
+                                <Text style={styles.cookBio}>{meal.cook.bio}</Text>
+                            ) : null}
                         </View>
                     </View>
 
@@ -152,7 +165,7 @@ const MealDetailScreen = () => {
                         ))
                     )}
 
-                    {/* Submit Review — only for customers who received this meal */}
+                    {}
                     {user?.role === 'Customer' && (
                         <View style={styles.reviewForm}>
                             <Text style={styles.sectionTitle}>Leave a Review</Text>
@@ -334,6 +347,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#333',
+    },
+    cookBio: {
+        fontSize: 13,
+        color: '#777',
+        marginTop: 4,
+        lineHeight: 18,
     },
     footer: {
         flexDirection: 'row',

@@ -4,13 +4,12 @@ import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../hooks/useAuth';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import API_BASE_URL from '../config';
 
-WebBrowser.maybeCompleteAuthSession();
+const GOOGLE_WEB_CLIENT_ID = '458326856465-j1jglm3t96ekrbjd9oir7gis0j55hh13.apps.googleusercontent.com';
 
-const GOOGLE_CLIENT_ID = '458326856465-j1jglm3t96ekrbjd9oir7gis0j55hh13.apps.googleusercontent.com';
+try { GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID }); } catch (e) { }
 
 const SignupScreen = () => {
     const [name, setName] = useState('');
@@ -23,22 +22,25 @@ const SignupScreen = () => {
     const router = useRouter();
     const { login, googleLogin } = useAuth();
 
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        webClientId: GOOGLE_CLIENT_ID,
-    });
-
-    useEffect(() => {
-        if (response?.type === 'success') {
-            const { authentication } = response;
-            handleGoogleSignup(authentication.accessToken);
+    const onGooglePress = async () => {
+        try {
+            await GoogleSignin.hasPlayServices();
+            await GoogleSignin.signOut();
+            await GoogleSignin.signIn();
+            const { accessToken } = await GoogleSignin.getTokens();
+            handleGoogleSignup(accessToken);
+        } catch (e) {
+            if (e?.code !== statusCodes.SIGN_IN_CANCELLED) {
+                Alert.alert('Google Sign-In Failed', e?.message || 'Please try again.');
+            }
         }
-    }, [response]);
+    };
 
     const handleGoogleSignup = async (accessToken) => {
         setLoading(true);
         try {
             const data = await googleLogin(accessToken);
-            if (data.isNewUser) {
+            if (!data.roleChosen) {
                 router.replace('/role-select');
             } else {
                 router.replace('/(tabs)');
@@ -89,9 +91,9 @@ const SignupScreen = () => {
 
                     <View style={styles.form}>
                         <TouchableOpacity
-                            style={[styles.googleBtn, (loading || !request) && styles.btnDisabled]}
-                            onPress={() => promptAsync()}
-                            disabled={loading || !request}
+                            style={[styles.googleBtn, loading && styles.btnDisabled]}
+                            onPress={onGooglePress}
+                            disabled={loading}
                         >
                             <Text style={styles.googleIcon}>G</Text>
                             <Text style={styles.googleBtnText}>Sign up with Google</Text>

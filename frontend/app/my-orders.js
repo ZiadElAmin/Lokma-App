@@ -1,13 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ordersApi from '../api/orders';
 import api from '../api/client';
 import withAuth from '../components/withAuth';
+import { useSocket } from '../hooks/useSocket';
 
 const MyOrdersScreen = () => {
     const router = useRouter();
+    const { subscribe } = useSocket();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -31,6 +33,26 @@ const MyOrdersScreen = () => {
             fetchOrders();
         }, [])
     );
+
+    useEffect(() => {
+        if (!subscribe) return;
+        const unsubscribe = subscribe(({ orderId, status }) => {
+            const customerStatuses = ['accepted', 'rejected', 'ready', 'picked_up', 'delivered'];
+            if (customerStatuses.includes(status)) {
+                setOrders(prev => prev.map(o =>
+                    o.id === orderId ? {
+                        ...o,
+                        isAccepted: status === 'accepted' ? true : o.isAccepted,
+                        isRejected: status === 'rejected' ? true : o.isRejected,
+                        isReadyForPickup: status === 'ready' ? true : o.isReadyForPickup,
+                        isPickedUp: status === 'picked_up' ? true : o.isPickedUp,
+                        isDelivered: status === 'delivered' ? true : o.isDelivered,
+                    } : o
+                ));
+            }
+        });
+        return unsubscribe;
+    }, [subscribe]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -63,6 +85,9 @@ const MyOrdersScreen = () => {
         if (order.isCancelled) return '#9E9E9E';
         if (order.isRejected) return '#f44336';
         if (order.isDelivered) return '#4CAF50';
+        if (order.isPickedUp) return '#9C27B0';
+        if (order.riderId) return '#00897B';
+        if (order.isReadyForPickup) return '#009688';
         if (order.isAccepted) return '#2196F3';
         if (order.isPaid) return '#FF9800';
         return '#999';
@@ -72,6 +97,9 @@ const MyOrdersScreen = () => {
         if (order.isCancelled) return 'Cancelled';
         if (order.isRejected) return 'Rejected';
         if (order.isDelivered) return 'Delivered';
+        if (order.isPickedUp) return 'On the way';
+        if (order.riderId) return 'Rider assigned';
+        if (order.isReadyForPickup) return 'Ready';
         if (order.isAccepted) return 'Preparing';
         if (order.isPaid) return 'Paid';
         return 'Pending';

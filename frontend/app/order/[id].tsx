@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { io } from 'socket.io-client';
 import ordersApi from '../../api/orders';
+import mealsApi from '../../api/meals';
 import { useAuth } from '../../hooks/useAuth';
 import API_BASE_URL from '../../config';
 
@@ -18,15 +19,55 @@ const OrderDetailScreen = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<any>(null);
     const [riderLocation, setRiderLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [now, setNow] = useState(Date.now());
     const socketRef = useRef<any>(null);
+
+    const [reviewTarget, setReviewTarget] = useState<{ mealId: string; name: string } | null>(null);
+    const [stars, setStars] = useState(5);
+    const [comment, setComment] = useState('');
+    const [submittingReview, setSubmittingReview] = useState(false);
+
+    const isMyOrder = order && user && order.userId === user.id;
+
+    const openReview = (mealId: string, name: string) => {
+        setReviewTarget({ mealId, name });
+        setStars(5);
+        setComment('');
+    };
+
+    const submitReview = async () => {
+        if (!reviewTarget) return;
+        setSubmittingReview(true);
+        try {
+            await mealsApi.createReview(reviewTarget.mealId, {
+                orderId: order.id,
+                rating: stars,
+                comment: comment.trim(),
+            });
+            setOrder((prev: any) => ({
+                ...prev,
+                reviewedMealIds: [...(prev.reviewedMealIds || []), reviewTarget.mealId],
+            }));
+            setReviewTarget(null);
+        } catch (err: any) {
+            Alert.alert('Could not submit review', err?.response?.data?.message || 'Please try again.');
+        }
+        setSubmittingReview(false);
+    };
+
+    useEffect(() => {
+        if (order?.isAccepted && !order?.isReadyForPickup && !order?.isPickedUp && !order?.isDelivered && !order?.isCancelled && order?.acceptedAt && order?.estimatedMinutes) {
+            const t = setInterval(() => setNow(Date.now()), 1000);
+            return () => clearInterval(t);
+        }
+    }, [order?.isAccepted, order?.isReadyForPickup, order?.acceptedAt, order?.estimatedMinutes]);
 
     useEffect(() => {
         const fetchOrder = async () => {
             try {
                 const data = await ordersApi.getOrderById(id);
                 setOrder(data);
-                // Connect to socket if order is picked up / on the way
-                if (data.isPickedUp && !data.isDelivered) {
+                if (data.riderId && !data.isDelivered) {
                     socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
                     socketRef.current.emit('join_order', id);
                     socketRef.current.on('location_update', (loc: any) => {
@@ -46,8 +87,10 @@ const OrderDetailScreen = () => {
     }, [id]);
 
     const getStatusColor = (order: any) => {
+        if (order.isCancelled) return '#9E9E9E';
         if (order.isDelivered) return '#4CAF50';
         if (order.isPickedUp) return '#9C27B0';
+        if (order.riderId) return '#00897B';            // rider assigned
         if (order.isReadyForPickup) return '#009688';
         if (order.isAccepted) return '#2196F3';
         if (order.isRejected) return '#f44336';
@@ -56,8 +99,12 @@ const OrderDetailScreen = () => {
     };
 
     const getStatusText = (order: any) => {
+        if (order.isCancelled) return '🚫 Cancelled';
         if (order.isDelivered) return '✅ Delivered';
         if (order.isPickedUp) return '🛵 Rider on the way';
+        if (order.riderId) return order.isReadyForPickup
+            ? '🛵 Rider heading to kitchen'
+            : '🛵 Rider assigned — cooking';
         if (order.isReadyForPickup) return '🍱 Ready — awaiting rider';
         if (order.isAccepted) return '👨‍🍳 Being prepared';
         if (order.isRejected) return '❌ Rejected';
@@ -103,11 +150,29 @@ const OrderDetailScreen = () => {
                         <Text style={styles.statusText}>{getStatusText(order)}</Text>
                     </View>
                     <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+
+                    {}
+                    {order.isAccepted && !order.isReadyForPickup && !order.isPickedUp && !order.isDelivered && !order.isCancelled && order.acceptedAt && order.estimatedMinutes ? (() => {
+                        const readyEta = new Date(order.acceptedAt).getTime() + order.estimatedMinutes * 60000;
+                        const remaining = Math.max(0, readyEta - now);
+                        const mins = Math.floor(remaining / 60000);
+                        const secs = Math.floor((remaining % 60000) / 1000);
+                        return (
+                            <View style={styles.countdownBox}>
+                                <Ionicons name="timer-outline" size={20} color="#ff6b35" />
+                                {remaining > 0 ? (
+                                    <Text style={styles.countdownText}>
+                                        Ready in {mins}:{secs.toString().padStart(2, '0')}
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.countdownText}>Finishing up — almost ready!</Text>
+                                )}
+                            </View>
+                        );
+                    })() : null}
                 </View>
 
-                {/* Live Map
-                    Cook  → sees rider approaching UNTIL pickup
-                    Customer → sees rider on the way AFTER pickup            */}
+                {}
                 {((user?.role === 'Cook' && order.riderId && !order.isPickedUp) ||
                   (user?.role !== 'Cook' && order.isPickedUp && !order.isDelivered)) && (
                     <View style={styles.mapSection}>
@@ -213,15 +278,32 @@ const OrderDetailScreen = () => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Order Items</Text>
-                    {order.orderItems?.map((item, index) => (
-                        <View key={item.id || index} style={styles.itemCard}>
-                            <View style={styles.itemInfo}>
-                                <Text style={styles.itemName}>{item.name}</Text>
-                                <Text style={styles.itemQty}>Qty: {item.qty}</Text>
+                    {order.orderItems?.map((item, index) => {
+                        const reviewed = order.reviewedMealIds?.includes(item.mealId);
+                        return (
+                            <View key={item.id || index} style={styles.itemCard}>
+                                <View style={styles.itemInfo}>
+                                    <Text style={styles.itemName}>{item.name}</Text>
+                                    <Text style={styles.itemQty}>Qty: {item.qty}</Text>
+                                    {}
+                                    {isMyOrder && order.isDelivered && (
+                                        reviewed ? (
+                                            <View style={styles.ratedTag}>
+                                                <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                                                <Text style={styles.ratedText}>Rated</Text>
+                                            </View>
+                                        ) : (
+                                            <TouchableOpacity style={styles.rateBtn} onPress={() => openReview(item.mealId, item.name)}>
+                                                <Ionicons name="star-outline" size={14} color="#ff6b35" />
+                                                <Text style={styles.rateBtnText}>Rate this meal</Text>
+                                            </TouchableOpacity>
+                                        )
+                                    )}
+                                </View>
+                                <Text style={styles.itemPrice}>EGP {(item.price * item.qty).toFixed(2)}</Text>
                             </View>
-                            <Text style={styles.itemPrice}>EGP {(item.price * item.qty).toFixed(2)}</Text>
-                        </View>
-                    ))}
+                        );
+                    })}
                 </View>
 
                 <View style={styles.section}>
@@ -254,6 +336,40 @@ const OrderDetailScreen = () => {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Review modal */}
+            <Modal visible={!!reviewTarget} transparent animationType="slide" onRequestClose={() => setReviewTarget(null)}>
+                <View style={styles.reviewOverlay}>
+                    <View style={styles.reviewSheet}>
+                        <Text style={styles.reviewTitle}>Rate {reviewTarget?.name}</Text>
+                        <View style={styles.starsRow}>
+                            {[1, 2, 3, 4, 5].map(n => (
+                                <TouchableOpacity key={n} onPress={() => setStars(n)}>
+                                    <Ionicons name={n <= stars ? 'star' : 'star-outline'} size={36} color="#FFB300" />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                        <TextInput
+                            style={styles.reviewInput}
+                            placeholder="Leave a comment (optional)"
+                            value={comment}
+                            onChangeText={setComment}
+                            multiline
+                            placeholderTextColor="#aaa"
+                        />
+                        <View style={styles.reviewActions}>
+                            <TouchableOpacity style={styles.reviewCancel} onPress={() => setReviewTarget(null)} disabled={submittingReview}>
+                                <Text style={styles.reviewCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.reviewSubmit} onPress={submitReview} disabled={submittingReview}>
+                                {submittingReview
+                                    ? <ActivityIndicator color="#fff" />
+                                    : <Text style={styles.reviewSubmitText}>Submit</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </>
     );
 };
@@ -302,6 +418,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
     },
+    countdownBox: {
+        flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14,
+        backgroundColor: '#fff4ef', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12,
+    },
+    countdownText: { fontSize: 16, fontWeight: '700', color: '#ff6b35' },
     section: {
         backgroundColor: '#fff',
         marginTop: 12,
@@ -392,6 +513,27 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa', padding: 16, borderRadius: 8,
     },
     paymentMethod: { marginLeft: 12, fontSize: 15, color: '#333' },
+    rateBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start',
+        backgroundColor: '#fff5f0', borderWidth: 1, borderColor: '#ffd5c2',
+        paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    },
+    rateBtnText: { color: '#ff6b35', fontWeight: '700', fontSize: 12 },
+    ratedTag: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+    ratedText: { color: '#4CAF50', fontWeight: '600', fontSize: 12 },
+    reviewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    reviewSheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+    reviewTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginBottom: 16, textAlign: 'center' },
+    starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
+    reviewInput: {
+        backgroundColor: '#f8f9fa', borderRadius: 10, padding: 14, minHeight: 70,
+        textAlignVertical: 'top', borderWidth: 1, borderColor: '#eee', color: '#333', marginBottom: 16,
+    },
+    reviewActions: { flexDirection: 'row', gap: 12 },
+    reviewCancel: { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: '#f0f0f0', alignItems: 'center' },
+    reviewCancelText: { color: '#555', fontWeight: '700' },
+    reviewSubmit: { flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: '#ff6b35', alignItems: 'center' },
+    reviewSubmitText: { color: '#fff', fontWeight: '700' },
     mapSection: { backgroundColor: '#fff', marginTop: 12, padding: 16 },
     map: { width: '100%', height: 250, borderRadius: 12, marginTop: 8, overflow: 'hidden' },
     mapPlaceholder: {

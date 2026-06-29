@@ -11,10 +11,42 @@ router.route('/users')
                 name: true,
                 email: true,
                 role: true,
+                violationCount: true,
+                isDisabled: true,
                 createdAt: true,
             },
         });
         res.json(users);
+    });
+
+router.route('/users/:id/disable')
+    .put(protect, admin, async (req, res) => {
+        const user = await prisma.user.update({
+            where: { id: req.params.id },
+            data: { isDisabled: true, isAvailable: false },
+            select: { id: true, name: true, isDisabled: true },
+        });
+        res.json(user);
+    });
+
+router.route('/users/:id/enable')
+    .put(protect, admin, async (req, res) => {
+        const user = await prisma.user.update({
+            where: { id: req.params.id },
+            data: { isDisabled: false, violationCount: 0, isAvailable: true },
+            select: { id: true, name: true, isDisabled: true, violationCount: true, isAvailable: true },
+        });
+        res.json(user);
+    });
+
+router.route('/violations')
+    .get(protect, admin, async (req, res) => {
+        const violations = await prisma.violation.findMany({
+            include: { cook: { select: { name: true, email: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        res.json(violations);
     });
 
 router.route('/users/:id')
@@ -32,6 +64,8 @@ router.route('/cooks')
                 id: true,
                 name: true,
                 email: true,
+                violationCount: true,
+                isDisabled: true,
                 createdAt: true,
             },
         });

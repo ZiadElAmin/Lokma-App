@@ -9,25 +9,30 @@ generator client {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  password    String
-  phone       String?
-  role        Role     @default(Customer)
-  isAvailable Boolean  @default(true)
-  pushToken   String?
-  avatar      String?
-  cookLat     Float?
-  cookLng     Float?
-  cookAddress String?
-  meals       Meal[]   @relation("CookMeals")
-  orders      Order[]
-  deliveries  Order[]  @relation("RiderDeliveries")
-  reviews     Review[]
-  addresses   Address[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  password       String
+  phone          String?
+  role           Role     @default(Customer)
+  roleChosen     Boolean  @default(true)
+  isAvailable    Boolean  @default(true)
+  pushToken      String?
+  avatar         String?
+  bio            String?
+  cookLat        Float?
+  cookLng        Float?
+  cookAddress    String?
+  violationCount Int      @default(0)
+  isDisabled     Boolean  @default(false)
+  meals          Meal[]   @relation("CookMeals")
+  orders         Order[]
+  deliveries     Order[]  @relation("RiderDeliveries")
+  reviews        Review[]
+  addresses      Address[]
+  violations     Violation[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Meal {
@@ -37,6 +42,7 @@ model Meal {
   price       Float
   image       String
   category    String       @default("Other")
+  estimatedTime Int?       // estimated cook time in minutes
   cook        User         @relation("CookMeals", fields: [cookId], references: [id])
   cookId      String
   reviews     Review[]
@@ -65,6 +71,8 @@ model Order {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   isAccepted         Boolean     @default(false)
+  acceptedAt         DateTime?
+  estimatedMinutes   Int?        // cook's estimated prep time, snapshotted at accept
   isRejected         Boolean     @default(false)
   aiVerified         Boolean     @default(false)
   isReadyForPickup   Boolean     @default(false)
@@ -76,6 +84,22 @@ model Order {
   isCancelled        Boolean     @default(false)
   deliveryLat        Float?
   deliveryLng        Float?
+  // PPE compliance tracking (10-min photo re-checks while actively cooking)
+  complianceDueAt        DateTime?
+  complianceReminderSent Boolean   @default(false)
+  complianceLastCheck    DateTime?
+  envSafe                Boolean?
+  envRecommendations     String?
+  reviews            Review[]
+}
+
+model Violation {
+  id        String   @id @default(cuid())
+  cook      User     @relation(fields: [cookId], references: [id])
+  cookId    String
+  orderId   String?
+  reason    String
+  createdAt DateTime @default(now())
 }
 
 model OrderItem {
@@ -88,6 +112,7 @@ model OrderItem {
   qty       Int
   image     String
   price     Float
+  note      String?
 }
 
 model Review {
@@ -99,8 +124,13 @@ model Review {
   userId    String
   meal      Meal     @relation(fields: [mealId], references: [id])
   mealId    String
+  order     Order?   @relation(fields: [orderId], references: [id])
+  orderId   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // One review per meal per order (old reviews have null orderId and are unaffected).
+  @@unique([userId, mealId, orderId])
 }
 
 model Address {

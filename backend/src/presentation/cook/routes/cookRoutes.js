@@ -1,12 +1,3 @@
-/**
- * Cook Presentation Layer - Routes
- * 
- * Cook features:
- * - Menu management (CRUD meals)
- * - AI hygiene check
- * - Order management
- * - View earnings
- */
 
 import express from 'express';
 import { protect, authorize } from '../../../middleware/authMiddleware.js';
@@ -18,7 +9,6 @@ const router = express.Router();
 
 const AI_SAFETY_URL = process.env.AI_SAFETY_URL || 'http://localhost:5001';
 
-// All routes require cook role
 router.use(protect);
 router.use(authorize('Cook', 'Admin'));
 
@@ -87,7 +77,7 @@ router.delete('/meals/:id', asyncHandler(async (req, res) => {
 
 router.put('/meals/:id/availability', asyncHandler(async (req, res) => {
     const { isAvailable } = req.body;
-    
+
     const meal = await prisma.meal.update({
         where: { id: req.params.id },
         data: { isAvailable }
@@ -120,7 +110,7 @@ router.post('/hygiene-check', asyncHandler(async (req, res) => {
 
         res.json(response.data);
     } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'AI Safety service unavailable',
             message: 'Please try again later'
         });

@@ -14,7 +14,6 @@ const validatePassword = (password) => {
     return password && password.length >= 6;
 };
 
-// @desc    Auth user & get token
 // @route   POST /api/users/login
 // @access  Public
 const authUser = asyncHandler(async (req, res) => {
@@ -40,6 +39,9 @@ const authUser = asyncHandler(async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            roleChosen: user.roleChosen,
+            isDisabled: user.isDisabled,
+            violationCount: user.violationCount,
             token: generateToken(user.id),
         });
     } else {
@@ -48,7 +50,6 @@ const authUser = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Register a new user
 // @route   POST /api/users
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
@@ -105,7 +106,6 @@ const registerUser = asyncHandler(async (req, res) => {
     });
 });
 
-// @desc    Get user profile
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -117,8 +117,12 @@ const getUserProfile = asyncHandler(async (req, res) => {
             email: true,
             phone: true,
             role: true,
+            roleChosen: true,
             avatar: true,
+            bio: true,
             isAvailable: true,
+            isDisabled: true,
+            violationCount: true,
             createdAt: true,
         },
     });
@@ -134,6 +138,10 @@ const getUserProfile = asyncHandler(async (req, res) => {
 const toggleAvailability = asyncHandler(async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) { res.status(404); throw new Error('User not found'); }
+    if (user.isDisabled && !user.isAvailable) {
+        res.status(403);
+        throw new Error('Your account is disabled. You cannot go online until an admin re-enables it.');
+    }
     const updated = await prisma.user.update({
         where: { id: req.user.id },
         data: { isAvailable: !user.isAvailable },
@@ -169,7 +177,7 @@ const googleAuth = asyncHandler(async (req, res) => {
         isNewUser = true;
         const randomPassword = await bcrypt.hash(Math.random().toString(36) + Date.now(), 10);
         user = await prisma.user.create({
-            data: { name: googleUser.name, email, password: randomPassword, role: 'Customer' },
+            data: { name: googleUser.name, email, password: randomPassword, role: 'Customer', roleChosen: false },
         });
     }
 
@@ -178,13 +186,16 @@ const googleAuth = asyncHandler(async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleChosen: user.roleChosen,
+        isDisabled: user.isDisabled,
+        violationCount: user.violationCount,
         isNewUser,
         token: generateToken(user.id),
     });
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-    const { name, phone, email } = req.body;
+    const { name, phone, email, bio } = req.body;
     if (email) {
         const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
         if (existing && existing.id !== req.user.id) {
@@ -198,8 +209,9 @@ const updateProfile = asyncHandler(async (req, res) => {
             ...(name && { name }),
             ...(phone !== undefined && { phone: phone || null }),
             ...(email && { email: email.toLowerCase() }),
+            ...(bio !== undefined && { bio: bio || null }),
         },
-        select: { id: true, name: true, email: true, phone: true, role: true, isAvailable: true },
+        select: { id: true, name: true, email: true, phone: true, role: true, avatar: true, bio: true, isAvailable: true },
     });
     res.json(updated);
 });
@@ -251,7 +263,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
 });
 
 const setRole = asyncHandler(async (req, res) => {
-    const { role } = req.body;
+    const { role, phone } = req.body;
     const allowedRoles = ['Customer', 'Cook', 'Rider'];
     if (!role || !allowedRoles.includes(role)) {
         res.status(400);
@@ -259,8 +271,8 @@ const setRole = asyncHandler(async (req, res) => {
     }
     const updated = await prisma.user.update({
         where: { id: req.user.id },
-        data: { role },
-        select: { id: true, name: true, email: true, role: true },
+        data: { role, roleChosen: true, ...(phone ? { phone: String(phone).trim() } : {}) },
+        select: { id: true, name: true, email: true, role: true, roleChosen: true, phone: true },
     });
     res.json(updated);
 });

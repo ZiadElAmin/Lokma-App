@@ -1,14 +1,13 @@
 import asyncHandler from 'express-async-handler';
 import prisma from '../config/db.js';
 
-// @desc    Fetch all meals
 // @route   GET /api/meals
 // @access  Public
 const getMeals = asyncHandler(async (req, res) => {
     const { search, cookId, category } = req.query;
     const meals = await prisma.meal.findMany({
         where: {
-            cook: { isAvailable: true },
+            cook: { isDisabled: false },
             ...(cookId ? { cookId } : {}),
             ...(category ? { category } : {}),
             ...(search ? {
@@ -19,15 +18,13 @@ const getMeals = asyncHandler(async (req, res) => {
             } : {}),
         },
         include: {
-            cook: { select: { id: true, name: true } },
+            cook: { select: { id: true, name: true, isAvailable: true } },
         },
         orderBy: { createdAt: 'desc' },
     });
     res.json(meals);
 });
 
-// @desc    Fetch cook's meals
-// @route   GET /api/meals/my-meals
 // @access  Private/Cook
 const getCookMeals = asyncHandler(async (req, res) => {
     const meals = await prisma.meal.findMany({
@@ -37,7 +34,6 @@ const getCookMeals = asyncHandler(async (req, res) => {
     res.json(meals);
 });
 
-// @desc    Fetch single meal
 // @route   GET /api/meals/:id
 // @access  Public
 const getMealById = asyncHandler(async (req, res) => {
@@ -50,6 +46,8 @@ const getMealById = asyncHandler(async (req, res) => {
                 select: {
                     id: true,
                     name: true,
+                    bio: true,
+                    avatar: true,
                 },
             },
         },
@@ -63,11 +61,10 @@ const getMealById = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Create a meal
 // @route   POST /api/meals
 // @access  Private/Cook
 const createMeal = asyncHandler(async (req, res) => {
-    const { name, price, description, image, category } = req.body;
+    const { name, price, description, image, category, estimatedTime } = req.body;
 
     const meal = await prisma.meal.create({
         data: {
@@ -77,17 +74,17 @@ const createMeal = asyncHandler(async (req, res) => {
             image,
             description,
             category: category || 'Other',
+            estimatedTime: estimatedTime ? Number(estimatedTime) : null,
         },
     });
 
     res.status(201).json(meal);
 });
 
-// @desc    Update a meal
 // @route   PUT /api/meals/:id
 // @access  Private/Cook
 const updateMeal = asyncHandler(async (req, res) => {
-    const { name, price, description, image, category } = req.body;
+    const { name, price, description, image, category, estimatedTime } = req.body;
 
     const meal = await prisma.meal.findUnique({
         where: {
@@ -111,6 +108,7 @@ const updateMeal = asyncHandler(async (req, res) => {
                 description,
                 image,
                 ...(category ? { category } : {}),
+                ...(estimatedTime !== undefined ? { estimatedTime: estimatedTime ? Number(estimatedTime) : null } : {}),
             },
         });
         res.json(updatedMeal);
@@ -120,7 +118,6 @@ const updateMeal = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Delete a meal
 // @route   DELETE /api/meals/:id
 // @access  Private/Cook
 const deleteMeal = asyncHandler(async (req, res) => {
@@ -148,10 +145,13 @@ const deleteMeal = asyncHandler(async (req, res) => {
 });
 const getCooks = asyncHandler(async (req, res) => {
     const cooks = await prisma.user.findMany({
-        where: { role: 'Cook', isAvailable: true },
+        where: { role: 'Cook', isDisabled: false },
         select: {
             id: true,
             name: true,
+            bio: true,
+            avatar: true,
+            isAvailable: true,
             meals: {
                 select: {
                     id: true,
@@ -168,30 +168,37 @@ const getCooks = asyncHandler(async (req, res) => {
 });
 
 const createReview = asyncHandler(async (req, res) => {
-    const { rating, comment } = req.body;
-    const meal = await prisma.meal.findUnique({
-        where: { id: req.params.id },
-        include: { reviews: true },
-    });
-    if (!meal) { res.status(404); throw new Error('Meal not found'); }
-
-    const alreadyReviewed = meal.reviews.find(r => r.userId === req.user.id);
-    if (alreadyReviewed) { res.status(400); throw new Error('You already reviewed this meal'); }
+    const { rating, comment, orderId } = req.body;
+    const mealId = req.params.id;
 
     if (!rating || rating < 1 || rating > 5) {
         res.status(400); throw new Error('Rating must be between 1 and 5');
     }
+    if (!orderId) {
+        res.status(400); throw new Error('An order is required to review a meal');
+    }
 
-    const deliveredOrder = await prisma.order.findFirst({
+    const meal = await prisma.meal.findUnique({ where: { id: mealId } });
+    if (!meal) { res.status(404); throw new Error('Meal not found'); }
+
+    const order = await prisma.order.findFirst({
         where: {
+            id: orderId,
             userId: req.user.id,
             isDelivered: true,
-            orderItems: { some: { mealId: req.params.id } },
+            orderItems: { some: { mealId } },
         },
     });
-    if (!deliveredOrder) {
+    if (!order) {
         res.status(403);
-        throw new Error('You can only review a meal after it has been delivered to you');
+        throw new Error('You can only review a meal from one of your delivered orders');
+    }
+
+    const alreadyReviewed = await prisma.review.findFirst({
+        where: { userId: req.user.id, mealId, orderId },
+    });
+    if (alreadyReviewed) {
+        res.status(400); throw new Error('You already reviewed this meal for this order');
     }
 
     await prisma.review.create({
@@ -199,7 +206,8 @@ const createReview = asyncHandler(async (req, res) => {
             rating: Number(rating),
             comment: comment || '',
             userId: req.user.id,
-            mealId: req.params.id,
+            mealId,
+            orderId,
             name: req.user.name,
         },
     });
@@ -217,19 +225,31 @@ const createReview = asyncHandler(async (req, res) => {
 });
 
 const canReviewMeal = asyncHandler(async (req, res) => {
-    const alreadyReviewed = await prisma.review.findFirst({
-        where: { userId: req.user.id, mealId: req.params.id },
-    });
-    if (alreadyReviewed) return res.json({ canReview: false, reason: 'already_reviewed' });
+    const mealId = req.params.id;
 
-    const deliveredOrder = await prisma.order.findFirst({
+    const deliveredOrders = await prisma.order.findMany({
         where: {
             userId: req.user.id,
             isDelivered: true,
-            orderItems: { some: { mealId: req.params.id } },
+            orderItems: { some: { mealId } },
         },
+        select: { id: true },
     });
-    res.json({ canReview: !!deliveredOrder, reason: deliveredOrder ? null : 'not_delivered' });
+    if (deliveredOrders.length === 0) {
+        return res.json({ canReview: false, reason: 'not_delivered' });
+    }
+
+    const reviewedOrderIds = (await prisma.review.findMany({
+        where: { userId: req.user.id, mealId, orderId: { not: null } },
+        select: { orderId: true },
+    })).map(r => r.orderId);
+
+    const unreviewed = deliveredOrders.find(o => !reviewedOrderIds.includes(o.id));
+    res.json({
+        canReview: !!unreviewed,
+        orderId: unreviewed?.id || null,
+        reason: unreviewed ? null : 'already_reviewed',
+    });
 });
 
 const getMealReviews = asyncHandler(async (req, res) => {

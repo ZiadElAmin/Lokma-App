@@ -35,14 +35,13 @@ const protect = asyncHandler(async (req, res, next) => {
     }
 });
 
-// Role-based authorization middleware
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
             res.status(401);
             throw new Error('Not authorized');
         }
-        
+
         if (roles.includes(req.user.role)) {
             next();
         } else {
@@ -52,7 +51,6 @@ const authorize = (...roles) => {
     };
 };
 
-// Legacy middleware (for backward compatibility)
 const cook = (req, res, next) => {
     if (req.user && (req.user.role === 'Cook' || req.user.role === 'Admin')) {
         next();

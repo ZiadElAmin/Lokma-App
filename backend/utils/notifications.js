@@ -1,4 +1,3 @@
-// Sends Expo push notifications to one or more push tokens
 export const sendPushNotification = async (tokens, title, body, data = {}) => {
     if (!tokens || tokens.length === 0) return;
 

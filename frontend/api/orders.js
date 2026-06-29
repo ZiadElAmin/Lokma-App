@@ -75,6 +75,21 @@ const getRiderOrders = async () => {
     return response.data;
 };
 
+const submitCompliance = async (id, aiVerified) => {
+    const response = await api.post(`/orders/${id}/compliance`, { aiVerified });
+    return response.data;
+};
+
+const envCheck = async (id, image, mimeType = 'image/jpeg') => {
+    const response = await api.post(`/orders/${id}/env-check`, { image, mimeType });
+    return response.data;
+};
+
+const getRecommendations = async (id) => {
+    const response = await api.get(`/orders/${id}/recommendations`);
+    return response.data;
+};
+
 export default {
     createOrder,
     getOrders,
@@ -91,4 +106,7 @@ export default {
     pickupOrder,
     deliverOrder,
     getRiderOrders,
+    submitCompliance,
+    envCheck,
+    getRecommendations,
 };

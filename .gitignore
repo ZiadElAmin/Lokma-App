@@ -16,6 +16,12 @@ nul
 .env
 *.env
 
+# Secrets / service-account keys (NEVER commit)
+*firebase-adminsdk*.json
+*serviceAccount*.json
+*service-account*.json
+lokma-a8433-firebase-adminsdk-fbsvc-5196789352.json
+
 # Build output
 /dist
 /build

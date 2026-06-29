@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import api, { setAuthToken, clearAuthToken } from '../api/client';
+import api, { setAuthToken, clearAuthToken, getAuthToken } from '../api/client';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
     }),
@@ -38,8 +39,8 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            const token = await api.defaults.headers.common.Authorization?.split(' ')[1];
-            
+            const token = await getAuthToken();
+
             if (!token) {
                 setUser(null);
                 setLoading(false);
@@ -48,6 +49,10 @@ export const AuthProvider = ({ children }) => {
 
             const response = await api.get('/users/profile');
             setUser(response.data);
+            const pushToken = await registerForPushNotifications();
+            if (pushToken) {
+                api.put('/users/push-token', { token: pushToken }).catch(() => {});
+            }
         } catch (err) {
             if (err.response?.status !== 401) {
                 setError(err.message);
@@ -71,7 +76,6 @@ export const AuthProvider = ({ children }) => {
             if (response.data.token) {
                 await setAuthToken(response.data.token);
                 setUser(response.data);
-                // Register push token after login
                 const pushToken = await registerForPushNotifications();
                 if (pushToken) {
                     api.put('/users/push-token', { token: pushToken }).catch(() => {});
@@ -128,10 +132,10 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const setUserRole = async (role) => {
+    const setUserRole = async (role, phone) => {
         try {
-            const response = await api.put('/users/role', { role });
-            setUser(prev => ({ ...prev, role: response.data.role }));
+            const response = await api.put('/users/role', { role, phone });
+            setUser(prev => ({ ...prev, role: response.data.role, roleChosen: true, phone: response.data.phone ?? prev?.phone }));
             return response.data;
         } catch (err) {
             const message = err.response?.data?.message || 'Failed to set role';

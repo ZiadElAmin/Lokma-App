@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-
+// el code el hena redundant khalas msh lazm tbos 3aleh
 function walk(dir) {
     let results = [];
     if (!fs.existsSync(dir)) return results;
@@ -31,8 +31,7 @@ for (const file of files) {
     // >$number  =>  >EGP number
     content = content.replace(/>\$([0-9])/g, '>EGP $1');
 
-    // : ${value}  =>  : EGP {value}  (only if it's literally a dollar sign and brace, not backtick)
-    // Actually look for exactly `g: ${` as in `Price per 100g: ${(price...)}`
+    
     content = content.replace(/g:\s*\$\{/g, 'g: EGP {');
 
     if (content !== original) {

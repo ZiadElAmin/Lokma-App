@@ -18,7 +18,7 @@ const WelcomeScreen = () => {
     }
 
     if (user) {
-        return <Redirect href="/(tabs)" />;
+        return <Redirect href={user.roleChosen === false ? '/role-select' : '/(tabs)'} />;
     }
 
     return (

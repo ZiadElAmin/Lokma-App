@@ -11,12 +11,14 @@ import { io } from 'socket.io-client';
 import ordersApi from '../../api/orders';
 import api from '../../api/client';
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../hooks/useSocket';
 import API_BASE_URL from '../../config';
 
 const SOCKET_URL = API_BASE_URL.replace('/api', '');
 
 export default function RiderDeliveriesScreen() {
     const { user } = useAuth();
+    const { subscribe } = useSocket();
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -24,11 +26,18 @@ export default function RiderDeliveriesScreen() {
     const [riderLocation, setRiderLocation] = useState<{ latitude: number; longitude: number } | null>(null);
     const socketRef = useRef<any>(null);
     const locationSubRef = useRef<any>(null);
+    const broadcastOrderRef = useRef<string | null>(null);
 
-    // Start broadcasting location for an active delivery
     const startLocationBroadcast = async (orderId: string) => {
+        if (broadcastOrderRef.current === orderId) return;
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') return;
+
+        if (broadcastOrderRef.current && broadcastOrderRef.current !== orderId) {
+            locationSubRef.current?.remove();
+            locationSubRef.current = null;
+        }
+        broadcastOrderRef.current = orderId;
 
         if (!socketRef.current) {
             socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
@@ -43,7 +52,6 @@ export default function RiderDeliveriesScreen() {
                 socketRef.current?.emit('rider_location', { orderId, latitude, longitude });
             }
         );
-        // Get initial position immediately
         const initial = await Location.getCurrentPositionAsync({});
         setRiderLocation({ latitude: initial.coords.latitude, longitude: initial.coords.longitude });
     };
@@ -53,11 +61,21 @@ export default function RiderDeliveriesScreen() {
         locationSubRef.current = null;
         socketRef.current?.disconnect();
         socketRef.current = null;
+        broadcastOrderRef.current = null;
     };
 
     useEffect(() => {
         return () => stopLocationBroadcast();
     }, []);
+
+    useEffect(() => {
+        const active = orders.find(o => o.riderId === user?.id && !o.isDelivered);
+        if (active) {
+            startLocationBroadcast(active.id);
+        } else {
+            stopLocationBroadcast();
+        }
+    }, [orders, user?.id]);
 
     const fetchOrders = async () => {
         try {
@@ -75,6 +93,18 @@ export default function RiderDeliveriesScreen() {
     };
 
     useEffect(() => { fetchOrders(); }, []);
+
+    useEffect(() => {
+        if (!subscribe) return;
+        const unsubscribe = subscribe(({ orderId, status }) => {
+            if (status === 'new_available') {
+                fetchOrders();
+            } else if (status === 'claimed') {
+                setOrders(prev => prev.filter(o => o.id !== orderId || o.riderId === user?.id));
+            }
+        });
+        return unsubscribe;
+    }, [subscribe, user?.id]);
 
     const handlePickup = (orderId: string) => {
         Alert.alert('Confirm Pickup', 'You have collected the order from the cook?', [
@@ -202,7 +232,7 @@ export default function RiderDeliveriesScreen() {
                                 ))}
                             </View>
 
-                            {/* Navigation map to COOK — shown before pickup */}
+                            {}
                             {!item.isPickedUp && !item.isDelivered && (() => {
                                 const cook = item.orderItems?.[0]?.meal?.cook;
                                 return cook?.cookLat ? (
@@ -258,7 +288,7 @@ export default function RiderDeliveriesScreen() {
                                 ) : null;
                             })()}
 
-                            {/* Navigation map to CUSTOMER — shown when on the way to customer */}
+                            {}
                             {item.isPickedUp && !item.isDelivered && item.deliveryLat && (
                                 <View style={styles.mapContainer}>
                                     <Text style={styles.mapLabel}>📍 Navigate to customer</Text>

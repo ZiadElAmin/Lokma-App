@@ -1,12 +1,3 @@
-/**
- * Delivery Presentation Layer - Routes
- * 
- * Delivery features:
- * - View available orders
- * - Accept deliveries
- * - Track deliveries
- * - Earnings
- */
 
 import express from 'express';
 import { protect, authorize } from '../../../middleware/authMiddleware.js';
@@ -15,11 +6,9 @@ import asyncHandler from 'express-async-handler';
 
 const router = express.Router();
 
-// All routes require delivery role
 router.use(protect);
 router.use(authorize('Delivery', 'Admin'));
 
-// @desc    Get available orders
 // @route   GET /api/delivery/available
 router.get('/available', asyncHandler(async (req, res) => {
     const orders = await prisma.order.findMany({
@@ -40,8 +29,6 @@ router.get('/available', asyncHandler(async (req, res) => {
     res.json(orders);
 }));
 
-// @desc    Get my deliveries
-// @route   GET /api/delivery/my-deliveries
 router.get('/my-deliveries', asyncHandler(async (req, res) => {
     const orders = await prisma.order.findMany({
         where: {
@@ -56,7 +43,6 @@ router.get('/my-deliveries', asyncHandler(async (req, res) => {
     res.json(orders);
 }));
 
-// @desc    Get delivery stats
 // @route   GET /api/delivery/stats
 router.get('/stats', asyncHandler(async (req, res) => {
     const deliveries = await prisma.order.findMany({

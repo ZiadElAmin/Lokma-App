@@ -1,20 +1,7 @@
-/**
- * Order Lifecycle Management Service
- * 
- * Order States:
- * 1. PENDING - Order created, waiting for cook
- * 2. ACCEPTED - Cook accepted the order
- * 3. COOKING - Cook is preparing the food
- * 4. READY - Food is ready for pickup
- * 5. PICKED_UP - Delivery person picked up
- * 6. DELIVERED - Order completed
- * 7. CANCELLED - Order cancelled
- */
 
 import prisma from '../../config/db.js';
 import asyncHandler from 'express-async-handler';
 
-// @desc    Create new order
 // @route   POST /api/orders
 // @access  Private/Customer
 const createOrder = asyncHandler(async (req, res) => {
@@ -60,12 +47,9 @@ const createOrder = asyncHandler(async (req, res) => {
         }
     });
 
-    // Notify nearby cooks (future: push notification)
-    
     res.status(201).json(order);
 });
 
-// @desc    Get orders based on user role
 // @route   GET /api/orders
 // @access  Private
 const getOrders = asyncHandler(async (req, res) => {
@@ -92,7 +76,6 @@ const getOrders = asyncHandler(async (req, res) => {
             whereClause.deliveryPersonId = userId;
             break;
         case 'Admin':
-            // Admin sees all orders
             break;
         default:
             throw new Error('Invalid role');
@@ -121,7 +104,6 @@ const getOrders = asyncHandler(async (req, res) => {
     res.json(orders);
 });
 
-// @desc    Get single order
 // @route   GET /api/orders/:id
 // @access  Private
 const getOrderById = asyncHandler(async (req, res) => {
@@ -151,7 +133,7 @@ const getOrderById = asyncHandler(async (req, res) => {
     // Check authorization
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     const isCustomer = order.userId === userId;
     const isCook = order.orderItems.some(item => item.meal.cookId === userId);
     const isDelivery = order.deliveryPersonId === userId;
@@ -165,7 +147,6 @@ const getOrderById = asyncHandler(async (req, res) => {
     res.json(order);
 });
 
-// @desc    Cook accepts order
 // @route   PUT /api/orders/:id/accept
 // @access  Private/Cook
 const acceptOrder = asyncHandler(async (req, res) => {
@@ -188,7 +169,6 @@ const acceptOrder = asyncHandler(async (req, res) => {
         throw new Error('Order cannot be accepted in current state');
     }
 
-    // Verify cook owns at least one item
     const cookOwnsItem = order.orderItems.some(item => item.meal.cookId === req.user.id);
     if (!cookOwnsItem) {
         res.status(403);
@@ -206,7 +186,6 @@ const acceptOrder = asyncHandler(async (req, res) => {
     res.json(updatedOrder);
 });
 
-// @desc    Start cooking order
 // @route   PUT /api/orders/:id/cooking
 // @access  Private/Cook
 const startCooking = asyncHandler(async (req, res) => {
@@ -235,7 +214,6 @@ const startCooking = asyncHandler(async (req, res) => {
     res.json(updatedOrder);
 });
 
-// @desc    Mark order as ready
 // @route   PUT /api/orders/:id/ready
 // @access  Private/Cook
 const markReady = asyncHandler(async (req, res) => {
@@ -264,7 +242,6 @@ const markReady = asyncHandler(async (req, res) => {
     res.json(updatedOrder);
 });
 
-// @desc    Delivery person picks up order
 // @route   PUT /api/orders/:id/pickup
 // @access  Private/Delivery
 const pickupOrder = asyncHandler(async (req, res) => {
@@ -299,7 +276,6 @@ const pickupOrder = asyncHandler(async (req, res) => {
     res.json(updatedOrder);
 });
 
-// @desc    Mark order as delivered
 // @route   PUT /api/orders/:id/deliver
 // @access  Private/Delivery
 const deliverOrder = asyncHandler(async (req, res) => {
@@ -362,7 +338,6 @@ const cancelOrder = asyncHandler(async (req, res) => {
     res.json(updatedOrder);
 });
 
-// @desc    Get orders for cook
 // @route   GET /api/orders/cook
 // @access  Private/Cook
 const getCookOrders = asyncHandler(async (req, res) => {
@@ -394,7 +369,6 @@ const getCookOrders = asyncHandler(async (req, res) => {
     res.json(orders);
 });
 
-// @desc    Get available orders for delivery
 // @route   GET /api/orders/available
 // @access  Private/Delivery
 const getAvailableOrders = asyncHandler(async (req, res) => {

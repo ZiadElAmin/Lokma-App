@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054341291540",
+    "project_id": "lokma-a8433",
+    "storage_bucket": "lokma-a8433.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054341291540:android:596338079785fbceed5101",
+        "android_client_info": {
+          "package_name": "com.homekitchen.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPYZer2IpY_i4x0MOOYMRn4ujhAwVLNhE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

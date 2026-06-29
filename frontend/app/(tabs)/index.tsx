@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View, Text, FlatList, StyleSheet, ActivityIndicator,
-    TouchableOpacity, Image, RefreshControl, Alert, ScrollView, TextInput
+    TouchableOpacity, Image, RefreshControl, Alert, ScrollView, TextInput, Modal
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ const MealsScreen = () => {
     const [cooks, setCooks] = useState([]);
     const [selectedCook, setSelectedCook] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [cookModalVisible, setCookModalVisible] = useState(false);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -45,7 +46,6 @@ const MealsScreen = () => {
         return () => clearTimeout(timer);
     }, [search, selectedCook, selectedCategory]);
 
-    // Auto refresh every time the screen comes into focus
     useFocusEffect(
         useCallback(() => {
             fetchData();
@@ -96,23 +96,8 @@ const MealsScreen = () => {
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <Text style={styles.headerGreeting}>Good afternoon! 👋</Text>
+                    <Text style={styles.headerGreeting}>Welcome!</Text>
                     <Text style={styles.headerTitle}>Lokma</Text>
-                </View>
-                <TouchableOpacity style={styles.locationBtn}>
-                    <Ionicons name="location" size={18} color="#ff6b35" />
-                    <Text style={styles.locationText}>Cairo, Egypt</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Promo Banner */}
-            <View style={styles.promoBanner}>
-                <View style={styles.promoContent}>
-                    <Text style={styles.promoTitle}>Free Delivery</Text>
-                    <Text style={styles.promoSubtitle}>On your first order</Text>
-                </View>
-                <View style={styles.promoIcon}>
-                    <Ionicons name="car" size={32} color="#fff" />
                 </View>
             </View>
 
@@ -160,40 +145,21 @@ const MealsScreen = () => {
             {/* Cooks Section */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Our Cooks</Text>
-            </View>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.cooksScrollContent}
-            >
-                <TouchableOpacity
-                    style={[styles.cookChip, !selectedCook && styles.cookChipActive]}
-                    onPress={() => setSelectedCook(null)}
-                >
-                    <Text style={[styles.cookChipText, !selectedCook && styles.cookChipTextActive]}>
-                        All
-                    </Text>
-                </TouchableOpacity>
-                {cooks.map((cook) => (
-                    <TouchableOpacity
-                        key={cook.id}
-                        style={[styles.cookChip, selectedCook === cook.id && styles.cookChipActive]}
-                        onPress={() => setSelectedCook(selectedCook === cook.id ? null : cook.id)}
-                    >
-                        <Ionicons
-                            name="restaurant"
-                            size={14}
-                            color={selectedCook === cook.id ? '#fff' : '#ff6b35'}
-                        />
-                        <Text style={[styles.cookChipText, selectedCook === cook.id && styles.cookChipTextActive]}>
-                            {cook.name}
-                        </Text>
-                        <Text style={[styles.cookChipCount, selectedCook === cook.id && styles.cookChipCountActive]}>
-                            {cook.meals?.length || 0} meals
-                        </Text>
+                {selectedCook && (
+                    <TouchableOpacity onPress={() => setSelectedCook(null)}>
+                        <Text style={styles.seeAllText}>Clear</Text>
                     </TouchableOpacity>
-                ))}
-            </ScrollView>
+                )}
+            </View>
+            <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+                <TouchableOpacity style={styles.browseCooksBtn} onPress={() => setCookModalVisible(true)}>
+                    <Ionicons name="people-outline" size={18} color="#ff6b35" />
+                    <Text style={styles.browseCooksBtnText}>
+                        {selectedCook ? `Viewing: ${cooks.find(c => c.id === selectedCook)?.name}` : 'Browse All Cooks'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color="#ff6b35" />
+                </TouchableOpacity>
+            </View>
 
             {/* Meals Section Title */}
             <View style={styles.sectionHeader}>
@@ -211,6 +177,67 @@ const MealsScreen = () => {
 
     return (
         <View style={styles.container}>
+            {/* Cook Picker Modal */}
+            <Modal
+                visible={cookModalVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setCookModalVisible(false)}
+            >
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCookModalVisible(false)}>
+                    <View style={styles.modalSheet} onStartShouldSetResponder={() => true}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>Our Cooks</Text>
+                        <ScrollView>
+                            <TouchableOpacity
+                                style={[styles.cookRow, !selectedCook && styles.cookRowActive]}
+                                onPress={() => { setSelectedCook(null); setCookModalVisible(false); }}
+                            >
+                                <View style={styles.cookRowAvatar}>
+                                    <Ionicons name="restaurant" size={20} color="#fff" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.cookRowName}>All Cooks</Text>
+                                    <Text style={styles.cookRowBio}>Show meals from everyone</Text>
+                                </View>
+                                {!selectedCook && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                            </TouchableOpacity>
+                            {cooks.map((cook) => (
+                                <TouchableOpacity
+                                    key={cook.id}
+                                    style={[styles.cookRow, selectedCook === cook.id && styles.cookRowActive]}
+                                    onPress={() => { setSelectedCook(cook.id); setCookModalVisible(false); }}
+                                >
+                                    <View style={styles.cookRowAvatar}>
+                                        {cook.avatar ? (
+                                            <Image source={{ uri: cook.avatar }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+                                        ) : (
+                                            <Ionicons name="person" size={20} color="#fff" />
+                                        )}
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={styles.cookRowName}>{cook.name}</Text>
+                                            {cook.isAvailable === false && (
+                                                <View style={styles.closedTag}>
+                                                    <Text style={styles.closedTagText}>Closed</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        {cook.bio ? (
+                                            <Text style={styles.cookRowBio} numberOfLines={2}>{cook.bio}</Text>
+                                        ) : (
+                                            <Text style={styles.cookRowBio}>{cook.meals?.length || 0} meals available</Text>
+                                        )}
+                                    </View>
+                                    {selectedCook === cook.id && <Ionicons name="checkmark-circle" size={20} color="#ff6b35" />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
             <FlatList
                 data={getDisplayedMeals()}
                 numColumns={2}
@@ -229,9 +256,17 @@ const MealsScreen = () => {
                         </Text>
                     </View>
                 }
-                renderItem={({ item, index }) => (
+                renderItem={({ item, index }) => {
+                    const unavailable = item.cook && item.cook.isAvailable === false;
+                    return (
                     <TouchableOpacity
-                        style={[styles.mealCard, index % 2 === 0 ? styles.mealCardLeft : styles.mealCardRight]}
+                        style={[
+                            styles.mealCard,
+                            index % 2 === 0 ? styles.mealCardLeft : styles.mealCardRight,
+                            unavailable && styles.mealCardDisabled,
+                        ]}
+                        activeOpacity={unavailable ? 1 : 0.2}
+                        disabled={unavailable}
                         onPress={() => router.push(`/meal/${item.id}`)}
                     >
                         <View style={styles.imageContainer}>
@@ -239,7 +274,13 @@ const MealsScreen = () => {
                                 source={{ uri: item.image || 'https://via.placeholder.com/200' }}
                                 style={styles.mealImage}
                             />
-                            {getCartCount() > 0 && (
+                            {unavailable && (
+                                <View style={styles.unavailableOverlay}>
+                                    <Ionicons name="moon" size={18} color="#fff" />
+                                    <Text style={styles.unavailableOverlayText}>Cook unavailable</Text>
+                                </View>
+                            )}
+                            {!unavailable && getCartCount() > 0 && (
                                 <View style={styles.cartBadgeSmall}>
                                     <Text style={styles.cartBadgeText}>{getCartCount()}</Text>
                                 </View>
@@ -269,18 +310,24 @@ const MealsScreen = () => {
                                         </View>
                                     )}
                                 </View>
-                                <TouchableOpacity style={styles.addBtn} onPress={() => handleAddToCart(item)}>
-                                    <Ionicons name="add" size={20} color="#fff" />
-                                </TouchableOpacity>
+                                {unavailable ? (
+                                    <View style={[styles.addBtn, styles.addBtnDisabled]}>
+                                        <Ionicons name="lock-closed" size={16} color="#fff" />
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity style={styles.addBtn} onPress={() => handleAddToCart(item)}>
+                                        <Ionicons name="add" size={20} color="#fff" />
+                                    </TouchableOpacity>
+                                )}
                             </View>
                         </View>
                     </TouchableOpacity>
-                )}
+                    );
+                }}
             />
         </View>
     );
 };
-
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f5f5f5' },
@@ -292,12 +339,6 @@ const styles = StyleSheet.create({
     header: { backgroundColor: '#fff', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 20 },
     headerGreeting: { fontSize: 14, color: '#888', marginBottom: 4 },
     headerTitle: { fontSize: 26, fontWeight: '800', color: '#1a1a1a', letterSpacing: -0.5 },
-    locationBtn: {
-        flexDirection: 'row', alignItems: 'center', marginTop: 12,
-        backgroundColor: '#fff5f0', alignSelf: 'flex-start',
-        paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    },
-    locationText: { fontSize: 13, color: '#666', marginLeft: 6, fontWeight: '500' },
     promoBanner: {
         backgroundColor: '#ff6b35', marginHorizontal: 20, marginTop: 16,
         borderRadius: 16, padding: 20, flexDirection: 'row',
@@ -332,17 +373,32 @@ const styles = StyleSheet.create({
     categoryChipActive: { backgroundColor: '#333', borderColor: '#333' },
     categoryChipText: { fontSize: 13, fontWeight: '600', color: '#555' },
     categoryChipTextActive: { color: '#fff' },
-    cooksScrollContent: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
-    cookChip: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
-        backgroundColor: '#fff', borderWidth: 1, borderColor: '#ff6b35',
-        paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    browseCooksBtn: {
+        flexDirection: 'row', alignItems: 'center', gap: 8,
+        backgroundColor: '#fff5f0', borderWidth: 1, borderColor: '#ffd5c2',
+        paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12,
     },
-    cookChipActive: { backgroundColor: '#ff6b35', borderColor: '#ff6b35' },
-    cookChipText: { fontSize: 13, fontWeight: '600', color: '#ff6b35' },
-    cookChipTextActive: { color: '#fff' },
-    cookChipCount: { fontSize: 11, color: '#ff9800' },
-    cookChipCountActive: { color: 'rgba(255,255,255,0.8)' },
+    browseCooksBtnText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#ff6b35' },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    modalSheet: {
+        backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        padding: 20, maxHeight: '75%',
+    },
+    modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#ddd', alignSelf: 'center', marginBottom: 16 },
+    modalTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 16 },
+    cookRow: {
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+        paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#f0f0f0',
+    },
+    cookRowActive: { backgroundColor: '#fff5f0', marginHorizontal: -4, paddingHorizontal: 4, borderRadius: 10 },
+    cookRowAvatar: {
+        width: 44, height: 44, borderRadius: 22, backgroundColor: '#ff6b35',
+        justifyContent: 'center', alignItems: 'center', overflow: 'hidden',
+    },
+    cookRowName: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
+    closedTag: { backgroundColor: '#fdecea', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
+    closedTagText: { fontSize: 10, color: '#f44336', fontWeight: '700' },
+    cookRowBio: { fontSize: 12, color: '#888', marginTop: 2 },
     emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
     emptyText: { fontSize: 18, fontWeight: '600', color: '#888', marginTop: 16 },
     emptySubtext: { fontSize: 14, color: '#aaa', marginTop: 8 },
@@ -354,6 +410,13 @@ const styles = StyleSheet.create({
     },
     mealCardLeft: { marginRight: 8 },
     mealCardRight: { marginLeft: 8 },
+    mealCardDisabled: { opacity: 0.55 },
+    unavailableOverlay: {
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', gap: 4,
+    },
+    unavailableOverlayText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    addBtnDisabled: { backgroundColor: '#bbb' },
     imageContainer: { position: 'relative' },
     mealImage: { width: '100%', height: 140, backgroundColor: '#f0f0f0' },
     cartBadgeSmall: {

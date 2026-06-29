@@ -6,44 +6,19 @@ import {
 import { Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
 import addressesApi from '../api/addresses';
+import LocationPicker from '../components/LocationPicker';
 
 const DEFAULT_LAT = 30.0444;
 const DEFAULT_LNG = 31.2357;
 
 const LABELS = ['Home', 'Work', 'Other'];
 
-const mapHTML = (lat: number, lng: number) => `
-<!DOCTYPE html><html>
-<head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>html,body,#map{height:100%;margin:0;padding:0;}
-  .tip{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:6px 14px;border-radius:20px;font-size:13px;z-index:999;white-space:nowrap;font-family:sans-serif;}</style>
-</head>
-<body>
-  <div class="tip">📍 Tap to place pin</div>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map').setView([${lat},${lng}],15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
-    var icon = L.divIcon({html:'<div style="font-size:32px;line-height:1;">📍</div>',iconSize:[32,32],iconAnchor:[16,32],className:''});
-    var marker = L.marker([${lat},${lng}],{icon:icon,draggable:true}).addTo(map);
-    function send(ll){window.ReactNativeWebView.postMessage(JSON.stringify({lat:ll.lat,lng:ll.lng}));}
-    marker.on('dragend',function(e){send(e.target.getLatLng());});
-    map.on('click',function(e){marker.setLatLng(e.latlng);send(e.latlng);});
-    send(marker.getLatLng());
-  </script>
-</body></html>`;
-
 export default function AddressesScreen() {
     const [addresses, setAddresses] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
 
-    // New address form state
     const [pin, setPin] = useState({ lat: DEFAULT_LAT, lng: DEFAULT_LNG });
     const [pinSet, setPinSet] = useState(false);
     const [label, setLabel] = useState('Home');
@@ -198,21 +173,13 @@ export default function AddressesScreen() {
 
                                 {/* Map */}
                                 <Text style={styles.fieldLabel}>Pin Location *</Text>
-                                <View style={styles.mapContainer}>
-                                    <WebView
-                                        originWhitelist={['*']}
-                                        source={{ html: mapHTML(DEFAULT_LAT, DEFAULT_LNG) }}
-                                        onMessage={(e) => {
-                                            try {
-                                                const { lat, lng } = JSON.parse(e.nativeEvent.data);
-                                                setPin({ lat, lng }); setPinSet(true);
-                                            } catch { }
-                                        }}
-                                        javaScriptEnabled
-                                        scrollEnabled={false}
-                                        style={{ flex: 1 }}
+                                {showModal && (
+                                    <LocationPicker
+                                        autoLocate
+                                        height={220}
+                                        onChange={(c) => { setPin(c); setPinSet(true); }}
                                     />
-                                </View>
+                                )}
                                 {pinSet && (
                                     <Text style={styles.pinConfirmed}>
                                         ✅ {pin.lat.toFixed(4)}, {pin.lng.toFixed(4)}
@@ -304,7 +271,17 @@ const styles = StyleSheet.create({
     labelChipActive: { backgroundColor: '#ff6b35' },
     labelChipText: { fontSize: 14, color: '#555', fontWeight: '600' },
     labelChipTextActive: { color: '#fff' },
+    locateBtn: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+        backgroundColor: '#ff6b35', paddingVertical: 11, borderRadius: 10, marginTop: 6, marginBottom: 8,
+    },
+    locateBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
     mapContainer: { height: 220, borderRadius: 12, overflow: 'hidden', marginTop: 4 },
+    mapLocating: {
+        position: 'absolute', top: 8, right: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16,
+    },
+    mapLocatingText: { fontSize: 12, color: '#555', fontWeight: '600' },
     pinConfirmed: { fontSize: 12, color: '#4CAF50', marginTop: 6, fontWeight: '600' },
     input: {
         backgroundColor: '#f8f9fa', borderRadius: 10, padding: 12,
