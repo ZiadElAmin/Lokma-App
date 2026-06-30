@@ -1,10 +1,11 @@
 import prisma from '../config/db.js';
 import { sendPushNotification } from './notifications.js';
 
-const CHECK_EVERY_MS = 60 * 1000;
+const CHECK_EVERY_MS = 15 * 1000;
 const GRACE_MS = 2 * 60 * 1000;
-const INTERVAL_MIN_MS = 7 * 60 * 1000;
-const INTERVAL_MAX_MS = 13 * 60 * 1000;
+// TESTING: re-check fires ~60s after acceptance. Restore to 7/13 min for production.
+const INTERVAL_MIN_MS = 60 * 1000;
+const INTERVAL_MAX_MS = 60 * 1000;
 const AUTO_DISABLE_THRESHOLD = 5;
 
 export const nextComplianceDue = () =>

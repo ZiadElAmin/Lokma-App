@@ -138,6 +138,10 @@ const acceptOrder = asyncHandler(async (req, res) => {
         res.status(403);
         throw new Error('Your account is disabled due to repeated hygiene violations. Contact support.');
     }
+    if (req.user.cookLat == null || req.user.cookLng == null) {
+        res.status(400);
+        throw new Error('Please set your kitchen location before accepting orders so riders can find you.');
+    }
     const order = await prisma.order.findUnique({
         where: { id: req.params.id },
         include: { user: true, orderItems: { include: { meal: { select: { estimatedTime: true } } } } },

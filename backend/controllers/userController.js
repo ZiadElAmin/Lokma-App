@@ -222,6 +222,8 @@ const saveLocation = asyncHandler(async (req, res) => {
         where: { id: req.user.id },
         data: { cookLat: lat, cookLng: lng, cookAddress: address || null },
     });
+    // Let riders' available-deliveries refresh — a cook may have orders waiting on a location.
+    req.app.get('io')?.to('riders').emit('order_update', { status: 'cook_location_updated', cookId: req.user.id });
     res.json({ message: 'Location saved' });
 });
 

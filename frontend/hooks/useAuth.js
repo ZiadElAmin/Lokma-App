@@ -14,6 +14,15 @@ Notifications.setNotificationHandler({
 
 const registerForPushNotifications = async () => {
     try {
+        if (Platform.OS === 'android') {
+            await Notifications.setNotificationChannelAsync('lokma-orders', {
+                name: 'Lokma Orders & Alerts',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#ff6b35',
+                sound: 'default',
+            });
+        }
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
         if (existingStatus !== 'granted') {

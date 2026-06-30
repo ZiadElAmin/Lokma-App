@@ -10,6 +10,8 @@ export const sendPushNotification = async (tokens, title, body, data = {}) => {
         title,
         body,
         data,
+        priority: 'high',
+        channelId: 'lokma-orders',
     }));
 
     try {

@@ -37,6 +37,7 @@ const CookDashboard = () => {
     const [meals, setMeals] = useState<Meal[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAvailable, setIsAvailable] = useState(true);
+    const [violationCount, setViolationCount] = useState(0);
     const [togglingAvailability, setTogglingAvailability] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
@@ -68,7 +69,10 @@ const CookDashboard = () => {
         if (user?.role === 'Cook' || user?.role === 'Admin') {
             fetchMyMeals();
             client.get('/orders/cook-earnings').then(r => setEarnings(r.data)).catch(() => {});
-            client.get('/users/profile').then(r => setIsAvailable(!!r.data.isAvailable)).catch(() => {});
+            client.get('/users/profile').then(r => {
+                setIsAvailable(!!r.data.isAvailable);
+                setViolationCount(r.data.violationCount || 0);
+            }).catch(() => {});
         }
     }, [user]);
 
@@ -281,6 +285,23 @@ const CookDashboard = () => {
                     <Ionicons name={isAvailable ? 'checkmark-circle' : 'close-circle'} size={16} color="#fff" />
                     <Text style={styles.availabilityText}>{isAvailable ? 'Open' : 'Closed'}</Text>
                 </TouchableOpacity>
+            </View>
+
+            <View style={[styles.hygieneChip, {
+                backgroundColor: violationCount >= 5 ? '#ffebee' : violationCount > 0 ? '#fff3e0' : '#e8f5e9',
+                borderColor: violationCount >= 5 ? '#f44336' : violationCount > 0 ? '#ff9800' : '#4CAF50',
+            }]}>
+                <Ionicons
+                    name={violationCount >= 5 ? 'alert-circle' : violationCount > 0 ? 'warning-outline' : 'shield-checkmark'}
+                    size={18}
+                    color={violationCount >= 5 ? '#f44336' : violationCount > 0 ? '#ff9800' : '#4CAF50'}
+                />
+                <Text style={[styles.hygieneChipText, {
+                    color: violationCount >= 5 ? '#c62828' : violationCount > 0 ? '#e65100' : '#2e7d32',
+                }]}>
+                    Hygiene record: {violationCount}/5 violations
+                    {violationCount >= 5 ? ' — account disabled' : violationCount > 0 ? ' — keep your gear on!' : ' — all clear'}
+                </Text>
             </View>
 
             {earnings && (
@@ -606,6 +627,22 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#999',
         marginTop: 8,
+    },
+    hygieneChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginHorizontal: 16,
+        marginTop: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+    },
+    hygieneChipText: {
+        fontSize: 13,
+        fontWeight: '600',
+        flexShrink: 1,
     },
     header: {
         backgroundColor: '#fff',

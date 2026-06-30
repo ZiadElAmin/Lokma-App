@@ -7,9 +7,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ordersApi from '../../api/orders';
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../hooks/useSocket';
 
 export default function RiderAvailableScreen() {
     const { user } = useAuth();
+    const { subscribe } = useSocket();
     const [orders, setOrders] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -28,6 +30,12 @@ export default function RiderAvailableScreen() {
     };
 
     useEffect(() => { fetchOrders(); }, []);
+
+    // Live refresh: new orders, claims by others, and cooks setting their location.
+    useEffect(() => {
+        const unsubscribe = subscribe(() => fetchOrders());
+        return unsubscribe;
+    }, []);
 
     const handleClaim = (orderId: string) => {
         Alert.alert(
@@ -99,7 +107,10 @@ export default function RiderAvailableScreen() {
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={styles.list}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders(); }} colors={['#ff6b35']} />}
-                    renderItem={({ item }) => (
+                    renderItem={({ item }) => {
+                        const cook = item.orderItems?.[0]?.meal?.cook;
+                        const cookHasLocation = cook && cook.cookLat != null && cook.cookLng != null;
+                        return (
                         <View style={styles.card}>
                             <View style={styles.cardHeader}>
                                 <Text style={styles.orderId}>Order #{item.id.slice(-6).toUpperCase()}</Text>
@@ -115,23 +126,20 @@ export default function RiderAvailableScreen() {
                             </View>
 
                             {/* Cook pickup location */}
-                            {(() => {
-                                const cook = item.orderItems?.[0]?.meal?.cook;
-                                return cook ? (
-                                    <View style={styles.cookRow}>
-                                        <Ionicons name="restaurant-outline" size={14} color="#ff6b35" />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={styles.cookLabel}>Pickup from: {cook.name}</Text>
-                                            {cook.cookAddress
+                            {cook ? (
+                                <View style={styles.cookRow}>
+                                    <Ionicons name="restaurant-outline" size={14} color="#ff6b35" />
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.cookLabel}>Pickup from: {cook.name}</Text>
+                                        {!cookHasLocation
+                                            ? <Text style={styles.cookNoLocation}>⏳ Waiting for cook to set their location…</Text>
+                                            : cook.cookAddress
                                                 ? <Text style={styles.cookAddress}>{cook.cookAddress}</Text>
-                                                : !cook.cookLat
-                                                    ? <Text style={styles.cookNoLocation}>⚠️ Cook hasn't set location yet</Text>
-                                                    : <Text style={styles.cookAddress}>{cook.cookLat?.toFixed(4)}, {cook.cookLng?.toFixed(4)}</Text>
-                                            }
-                                        </View>
+                                                : <Text style={styles.cookAddress}>{cook.cookLat?.toFixed(4)}, {cook.cookLng?.toFixed(4)}</Text>
+                                        }
                                     </View>
-                                ) : null;
-                            })()}
+                                </View>
+                            ) : null}
 
                             <View style={styles.row}>
                                 <Ionicons name="location-outline" size={14} color="#666" />
@@ -146,13 +154,21 @@ export default function RiderAvailableScreen() {
 
                             <View style={styles.cardFooter}>
                                 <Text style={styles.price}>EGP {item.totalPrice.toFixed(2)}</Text>
-                                <TouchableOpacity style={styles.claimBtn} onPress={() => handleClaim(item.id)}>
-                                    <Ionicons name="bicycle" size={16} color="#fff" />
-                                    <Text style={styles.claimBtnText}>Claim Delivery</Text>
-                                </TouchableOpacity>
+                                {cookHasLocation ? (
+                                    <TouchableOpacity style={styles.claimBtn} onPress={() => handleClaim(item.id)}>
+                                        <Ionicons name="bicycle" size={16} color="#fff" />
+                                        <Text style={styles.claimBtnText}>Claim Delivery</Text>
+                                    </TouchableOpacity>
+                                ) : (
+                                    <View style={[styles.claimBtn, styles.claimBtnDisabled]}>
+                                        <Ionicons name="time-outline" size={16} color="#fff" />
+                                        <Text style={styles.claimBtnText}>Location pending</Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
-                    )}
+                        );
+                    }}
                 />
             )}
         </SafeAreaView>
@@ -191,6 +207,7 @@ const styles = StyleSheet.create({
     cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#eee' },
     price: { fontSize: 16, fontWeight: 'bold', color: '#ff6b35' },
     claimBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ff6b35', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, gap: 6 },
+    claimBtnDisabled: { backgroundColor: '#bbb' },
     claimBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
     emptyText: { fontSize: 20, fontWeight: 'bold', color: '#666', marginTop: 16 },
     emptySubtext: { fontSize: 14, color: '#999', marginTop: 8 },
